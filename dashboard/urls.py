@@ -26,8 +26,10 @@ urlpatterns = [
     path('planning/', views.planning_dashboard, name='planning_dashboard'),
     path('planning/add-event/', views.add_planning_event, name='add_planning_event'),
     
-    # Assistant
-    path('assistant/', views.ai_assistant, name='ai_assistant'),
+   # Assistant IA
+   path('assistant/', views.ai_assistant, name='ai_assistant'),
+   path('assistant/ask/', views.ask_ai_assistant, name='ask_ai_assistant'),
+   path('assistant/analyze/', views.run_ai_analysis, name='run_ai_analysis'),
     
     # Auth
     path('accounts/login/', LoginView.as_view(template_name='dashboard/login.html'), name='login'),

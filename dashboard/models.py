@@ -117,3 +117,31 @@ class PlanningEvent(models.Model):
     @property
     def duration(self):
         return (self.end_date - self.start_date).days + 1    
+    
+class AIAnalysis(models.Model):
+    ANALYSIS_TYPES = [
+        ('stock', 'Analyse Stock'),
+        ('production', 'Analyse Production'),
+        ('sales', 'Analyse Ventes'),
+        ('efficiency', 'Analyse Efficacité'),
+    ]
+    
+    analysis_type = models.CharField(max_length=20, choices=ANALYSIS_TYPES)
+    title = models.CharField(max_length=200)
+    insights = models.JSONField()  # Stocke les insights sous forme JSON
+    recommendations = models.JSONField()  # Recommandations sous forme JSON
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)
+    
+    def __str__(self):
+        return f"{self.get_analysis_type_display()} - {self.created_at.date()}"
+
+class AIConversation(models.Model):
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    question = models.TextField()
+    answer = models.TextField()
+    context = models.JSONField(default=dict)  # Contexte des données au moment de la question
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.created_at.date()}"    

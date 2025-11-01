@@ -4,8 +4,9 @@ from django.contrib import messages
 from django.db.models import Q, F, Sum
 from django.utils import timezone
 from django.db import models
-from .models import Order, Product, Customer, StockMovement, OrderItem, PlanningEvent
+from .models import Order, Product, Customer, StockMovement, OrderItem, PlanningEvent, AIConversation, AIAnalysis
 from .forms import ProductForm, OrderForm, StockMovementForm, CustomerForm
+from django.http import JsonResponse 
 
 @login_required
 def dashboard(request):
@@ -417,3 +418,366 @@ def calculate_workload():
 @login_required
 def ai_assistant(request):
     return render(request, 'dashboard/assistant/assistant.html')
+
+@login_required
+def ai_assistant(request):
+    # Analyses automatiques
+    stock_analysis = analyze_stock_situation()
+    production_analysis = analyze_production_efficiency()
+    alert_analysis = analyze_alerts()
+    
+    # Conversations récentes
+    recent_conversations = AIConversation.objects.filter(
+        user=request.user
+    ).order_by('-created_at')[:5]
+    
+    context = {
+        'stock_analysis': stock_analysis,
+        'production_analysis': production_analysis,
+        'alert_analysis': alert_analysis,
+        'recent_conversations': recent_conversations,
+    }
+    return render(request, 'dashboard/assistant/assistant.html', context)
+
+@login_required
+def ask_ai_assistant(request):
+    if request.method == 'POST':
+        question = request.POST.get('question', '').strip()
+        
+        if question:
+            # Analyser le contexte actuel
+            context = get_current_business_context()
+            
+            # Générer une réponse intelligente
+            answer = generate_ai_response(question, context)
+            
+            # Sauvegarder la conversation
+            conversation = AIConversation(
+                user=request.user,
+                question=question,
+                answer=answer,
+                context=context
+            )
+            conversation.save()
+            
+            return JsonResponse({
+                'success': True,
+                'answer': answer,
+                'timestamp': conversation.created_at.strftime('%d/%m/%Y %H:%M')
+            })
+    
+    return JsonResponse({'success': False, 'error': 'Question vide'})
+
+@login_required
+def run_ai_analysis(request):
+    analysis_type = request.POST.get('analysis_type')
+    
+    if analysis_type == 'stock':
+        result = analyze_stock_situation(detailed=True)
+    elif analysis_type == 'production':
+        result = analyze_production_efficiency(detailed=True)
+    elif analysis_type == 'alerts':
+        result = analyze_alerts(detailed=True)
+    else:
+        result = {'error': 'Type d\'analyse non reconnu'}
+    
+    return JsonResponse(result)
+
+# ========== FONCTIONS D'ANALYSE INTELLIGENTE ==========
+
+def get_current_business_context():
+    """Récupère le contexte métier actuel pour l'IA"""
+    return {
+        'low_stock_products': list(Product.objects.filter(
+            current_stock__lte=F('min_stock')
+        ).values('reference', 'name', 'current_stock', 'min_stock')),
+        
+        'delayed_orders': list(Order.objects.filter(
+            delivery_date__lt=timezone.now().date(),
+            status__in=['confirmed', 'in_production']
+        ).values('order_number', 'customer__name', 'delivery_date')),
+        
+        'active_orders_count': Order.objects.filter(status='in_production').count(),
+        'total_products': Product.objects.count(),
+        'total_customers': Customer.objects.count(),
+        
+        'recent_stock_movements': list(StockMovement.objects.select_related(
+            'product'
+        ).order_by('-created_at')[:10].values(
+            'product__reference', 'movement_type', 'quantity', 'reason', 'created_at'
+        ))
+    }
+
+def generate_ai_response(question, context):
+    """Génère une réponse intelligente basée sur les données"""
+    question_lower = question.lower()
+    
+    # Détection d'intention simple
+    if any(word in question_lower for word in ['stock', 'inventaire', 'niveau']):
+        return generate_stock_response(question, context)
+    elif any(word in question_lower for word in ['commande', 'production', 'retard']):
+        return generate_production_response(question, context)
+    elif any(word in question_lower for word in ['alerte', 'problème', 'urgence']):
+        return generate_alert_response(question, context)
+    elif any(word in question_lower for word in ['conseil', 'suggestion', 'optimiser']):
+        return generate_optimization_response(question, context)
+    else:
+        return generate_general_response(question, context)
+
+def generate_stock_response(question, context):
+    """Réponses intelligentes sur le stock"""
+    low_stock_count = len(context['low_stock_products'])
+    
+    if low_stock_count > 0:
+        products_list = "\n".join([
+            f"- {p['reference']} ({p['name']}) : {p['current_stock']} unités (min: {p['min_stock']})"
+            for p in context['low_stock_products'][:3]
+        ])
+        
+        return f"""🔴 **Alerte Stock** 
+
+J'ai détecté {low_stock_count} produits avec un stock faible :
+
+{products_list}
+
+**Recommandations :**
+• Planifier un réapprovisionnement urgent
+• Vérifier les commandes en cours pour ces produits
+• Contacter les fournisseurs prioritaires
+
+Voulez-vous que je génère une liste de réapprovisionnement ?"""
+    else:
+        return """✅ **État du Stock**
+
+Tous vos produits ont un niveau de stock satisfaisant ! 
+
+**Statistiques :**
+• Produits suivis : {total_products}
+• Aucune alerte stock active
+• Dernier mouvement : {last_movement}
+
+Tout semble sous contrôle ! 👍""".format(
+            total_products=context['total_products'],
+            last_movement=context['recent_stock_movements'][0]['created_at'].strftime('%d/%m/%Y') if context['recent_stock_movements'] else 'Aucun'
+        )
+
+def generate_production_response(question, context):
+    """Réponses intelligentes sur la production"""
+    delayed_count = len(context['delayed_orders'])
+    active_orders = context['active_orders_count']
+    
+    if delayed_count > 0:
+        orders_list = "\n".join([
+            f"- {o['order_number']} pour {o['customer__name']} (retard depuis {o['delivery_date']})"
+            for o in context['delayed_orders'][:3]
+        ])
+        
+        return f"""⚠️ **Retards de Production**
+
+{delayed_count} commande(s) sont en retard :
+
+{orders_list}
+
+**Actions recommandées :**
+• Contacter les clients pour les informer
+• Prioriser ces commandes en production
+• Vérifier la disponibilité des matières premières
+
+Voulez-vous que je génère des emails d'information pour ces clients ?"""
+    else:
+        return f"""🏭 **Production en Cours**
+
+**Tableau de bord production :**
+• Commandes en cours : {active_orders}
+• Commandes en retard : 0 ✅
+• Taux de service : Excellent
+
+Toutes les commandes respectent les délais ! 🎉"""
+
+def generate_alert_response(question, context):
+    """Réponses pour les alertes"""
+    alerts = []
+    
+    # Alertes stock
+    if context['low_stock_products']:
+        alerts.append(f"🔴 {len(context['low_stock_products'])} produits en stock faible")
+    
+    # Alertes retards
+    if context['delayed_orders']:
+        alerts.append(f"⚠️ {len(context['delayed_orders'])} commandes en retard")
+    
+    if alerts:
+        alerts_text = "\n".join([f"• {alert}" for alert in alerts])
+        return f"""🚨 **Alertes Actives**
+
+{alerts_text}
+
+**Priorités :**
+1. Traiter les stocks critiques
+2. Gérer les retards clients
+3. Planifier la production
+
+Que souhaitez-vous adresser en premier ?"""
+    else:
+        return """✅ **Aucune Alerte Critique**
+
+Aucune alerte nécessitant une attention immédiate. 
+
+**Statut :** Tout est sous contrôle 👍
+
+**Conseil :** Profitez-en pour optimiser vos processus !"""
+
+def generate_optimization_response(question, context):
+    """Recommandations d'optimisation"""
+    recommendations = [
+        "📊 **Analyser le TRS** : Vérifiez l'efficacité globale de vos équipements",
+        "🔄 **Optimiser les flux** : Réduisez les temps de changement de série",
+        "📦 **Automatiser les alertes** : Configurez des notifications proactives",
+        "🤖 **Planifier la maintenance** : Anticipez les arrêts techniques"
+    ]
+    
+    rec_text = "\n".join([f"• {rec}" for rec in recommendations])
+    
+    return f"""💡 **Recommandations d'Optimisation**
+
+{rec_text}
+
+**Question :** Sur quel aspect souhaitez-vous vous améliorer ?"""
+
+def generate_general_response(question, context):
+    """Réponses générales de l'assistant"""
+    return f"""🤖 **Assistant ERP Copilot**
+
+J'ai analysé votre question : "{question}"
+
+**Contexte actuel :**
+• {len(context['low_stock_products'])} produits en alerte stock
+• {len(context['delayed_orders'])} commandes en retard  
+• {context['active_orders_count']} commandes en production
+
+**Comment puis-vous vous aider ?**
+• Analyse détaillée du stock
+• Optimisation de la production
+• Gestion des alertes
+• Rapports de performance
+
+Dites-moi ce qui vous préoccupe ! 💪"""
+
+def analyze_stock_situation(detailed=False):
+    """Analyse intelligente du stock"""
+    low_stock_products = Product.objects.filter(current_stock__lte=F('min_stock'))
+    critical_products = Product.objects.filter(current_stock=0)
+    
+    analysis = {
+        'low_stock_count': low_stock_products.count(),
+        'critical_count': critical_products.count(),
+        'total_products': Product.objects.count(),
+        'insights': [],
+        'recommendations': []
+    }
+    
+    if detailed:
+        analysis['low_stock_products'] = list(low_stock_products.values(
+            'reference', 'name', 'current_stock', 'min_stock'
+        ))
+        analysis['critical_products'] = list(critical_products.values(
+            'reference', 'name'
+        ))
+    
+    # Insights
+    if analysis['critical_count'] > 0:
+        analysis['insights'].append(f"{analysis['critical_count']} produits en rupture de stock")
+    
+    if analysis['low_stock_count'] > 3:
+        analysis['insights'].append("Plusieurs produits nécessitent un réapprovisionnement urgent")
+    
+    # Recommandations
+    if analysis['critical_count'] > 0:
+        analysis['recommendations'].append("Commander d'urgence les produits en rupture")
+    
+    if analysis['low_stock_count'] > 0:
+        analysis['recommendations'].append("Réviser les niveaux de stock minimum")
+    
+    return analysis
+
+def analyze_production_efficiency(detailed=False):
+    """Analyse de l'efficacité production"""
+    delayed_orders = Order.objects.filter(
+        delivery_date__lt=timezone.now().date(),
+        status__in=['confirmed', 'in_production']
+    )
+    
+    analysis = {
+        'delayed_orders_count': delayed_orders.count(),
+        'total_active_orders': Order.objects.filter(status='in_production').count(),
+        'on_time_rate': calculate_on_time_rate(),
+        'insights': [],
+        'recommendations': []
+    }
+    
+    if detailed:
+        analysis['delayed_orders'] = list(delayed_orders.values(
+            'order_number', 'customer__name', 'delivery_date'
+        ))
+    
+    # Insights
+    if analysis['delayed_orders_count'] > 0:
+        analysis['insights'].append(f"{analysis['delayed_orders_count']} commandes en retard")
+    
+    if analysis['on_time_rate'] < 90:
+        analysis['insights'].append("Taux de ponctualité inférieur à 90%")
+    
+    # Recommandations
+    if analysis['delayed_orders_count'] > 0:
+        analysis['recommendations'].append("Mettre en place un plan de rattrapage")
+    
+    analysis['recommendations'].append("Optimiser la planification de la production")
+    
+    return analysis
+
+def analyze_alerts(detailed=False):
+    """Analyse consolidée des alertes"""
+    alerts = {
+        'stock_alerts': Product.objects.filter(current_stock__lte=F('min_stock')).count(),
+        'delivery_alerts': Order.objects.filter(
+            delivery_date__lt=timezone.now().date(),
+            status__in=['confirmed', 'in_production']
+        ).count(),
+        'priority_alerts': [],
+        'insights': [],
+        'recommendations': []
+    }
+    
+    # Déterminer la priorité
+    if alerts['stock_alerts'] > 5:
+        alerts['priority_alerts'].append("STOCK: Plus de 5 produits en alerte")
+    
+    if alerts['delivery_alerts'] > 3:
+        alerts['priority_alerts'].append("LIVRAISON: Plusieurs retards clients")
+    
+    # Insights
+    if alerts['stock_alerts'] > 0:
+        alerts['insights'].append(f"{alerts['stock_alerts']} alertes stock à traiter")
+    
+    if alerts['delivery_alerts'] > 0:
+        alerts['insights'].append(f"{alerts['delivery_alerts']} retards de livraison")
+    
+    # Recommandations
+    if alerts['priority_alerts']:
+        alerts['recommendations'].append("Traiter les alertes prioritaires immédiatement")
+    
+    alerts['recommendations'].append("Mettre à jour le tableau de bord quotidien")
+    
+    return alerts
+
+def calculate_on_time_rate():
+    """Calcule le taux de ponctualité"""
+    total_delivered = Order.objects.filter(status__in=['shipped', 'delivered']).count()
+    on_time_delivered = Order.objects.filter(
+        status__in=['shipped', 'delivered'],
+        delivery_date__gte=models.F('created_at')
+    ).count()
+    
+    if total_delivered > 0:
+        return round((on_time_delivered / total_delivered) * 100, 1)
+    return 100.0
