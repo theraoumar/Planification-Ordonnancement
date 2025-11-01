@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+
+{% block title %}Supprimer {{ order.order_number }} - ERP Copilot{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-trash me-2"></i>Supprimer la commande
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{% url 'order_detail' order.id %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>Retour au détail
+        </a>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Confirmation de suppression</h5>
+            </div>
+            <div class="card-body text-center">
+                <div class="mb-4">
+                    <i class="fas fa-trash-alt fa-3x text-danger mb-3"></i>
+                    <h4>Êtes-vous sûr de vouloir supprimer cette commande ?</h4>
+                    <p class="text-muted">Cette action est irréversible.</p>
+                </div>
+                
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ order.order_number }}</h5>
+                        <p class="card-text">{{ order.customer.name }}</p>
+                        <div class="row text-muted">
+                            <div class="col-6">
+                                <strong>Date:</strong><br>
+                                {{ order.created_at|date:"d/m/Y" }}
+                            </div>
+                            <div class="col-6">
+                                <strong>Statut:</strong><br>
+                                <span class="badge bg-secondary">{{ order.get_status_display }}</span>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <strong>Total:</strong> {{ order.total_amount }} €<br>
+                            <strong>Produits:</strong> {{ order.items.count }}
+                        </div>
+                    </div>
+                </div>
+
+                {% if order.status != 'draft' %}
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    <strong>Attention !</strong> Cette commande a le statut "{{ order.get_status_display }}". 
+                    Il est recommandé de l'annuler plutôt que de la supprimer.
+                </div>
+                {% endif %}
+
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                        <a href="{% url 'order_detail' order.id %}" class="btn btn-secondary me-md-2">
+                            <i class="fas fa-times me-1"></i>Annuler
+                        </a>
+                        <button type="submit" class="btn btn-danger" 
+                                onclick="return confirm('Êtes-vous ABSOLUMENT sûr ? Cette action ne peut pas être annulée.')">
+                            <i class="fas fa-trash me-1"></i>Confirmer la suppression
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

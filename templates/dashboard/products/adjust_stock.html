@@ -1,0 +1,148 @@
+{% extends 'base.html' %}
+
+{% block title %}Ajuster Stock - {{ product.reference }} - ERP Copilot{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-edit me-2"></i>Ajuster le Stock
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{% url 'product_list' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>Retour aux produits
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card shadow">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">Ajustement de stock - {{ product.reference }}</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    {% if form.errors %}
+                    <div class="alert alert-danger">
+                        <strong>Erreur(s) dans le formulaire :</strong>
+                        <ul class="mb-0">
+                            {% for field, errors in form.errors.items %}
+                                {% for error in errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Produit</label>
+                        <input type="text" class="form-control" value="{{ product.reference }} - {{ product.name }}" readonly>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Stock actuel</label>
+                        <input type="text" class="form-control" value="{{ product.current_stock }} unités" readonly>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Type de mouvement *</label>
+                        {{ form.movement_type }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Quantité *</label>
+                        {{ form.quantity }}
+                        <div class="form-text">La quantité doit être positive.</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Raison *</label>
+                        {{ form.reason }}
+                        <div class="form-text">Ex: Réapprovisionnement, Inventaire, Vente, etc.</div>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{% url 'product_list' %}" class="btn btn-secondary me-md-2">Annuler</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-1"></i>Enregistrer le mouvement
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <!-- Informations produit -->
+        <div class="card">
+            <div class="card-header bg-light">
+                <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Informations du produit</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-6">
+                        <strong>Référence:</strong><br>
+                        {{ product.reference }}
+                    </div>
+                    <div class="col-6">
+                        <strong>Nom:</strong><br>
+                        {{ product.name }}
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-6">
+                        <strong>Prix:</strong><br>
+                        {{ product.price }} €
+                    </div>
+                    <div class="col-6">
+                        <strong>Stock min:</strong><br>
+                        {{ product.min_stock }}
+                    </div>
+                </div>
+                <hr>
+                <div class="text-center">
+                    <strong>Statut:</strong><br>
+                    {% if product.is_low_stock %}
+                        <span class="badge bg-danger">Stock Faible</span>
+                    {% else %}
+                        <span class="badge bg-success">Stock OK</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Derniers mouvements -->
+        <div class="card mt-3">
+            <div class="card-header bg-light">
+                <h6 class="mb-0"><i class="fas fa-history me-2"></i>Derniers mouvements</h6>
+            </div>
+            <div class="card-body">
+                {% with movements=product.stockmovement_set.all|slice:":5" %}
+                    {% if movements %}
+                        {% for movement in movements %}
+                        <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                            <div>
+                                <div class="small">
+                                    <strong>{{ movement.get_movement_type_display }}</strong>
+                                </div>
+                                <div class="text-muted small">{{ movement.reason }}</div>
+                                <div class="text-muted small">{{ movement.created_at|date:"d/m/Y H:i" }}</div>
+                            </div>
+                            <span class="badge {% if movement.movement_type == 'in' %}bg-success{% else %}bg-warning{% endif %}">
+                                {% if movement.movement_type == 'in' %}+{% else %}-{% endif %}{{ movement.quantity }}
+                            </span>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-muted small text-center">Aucun mouvement récent</div>
+                    {% endif %}
+                {% endwith %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

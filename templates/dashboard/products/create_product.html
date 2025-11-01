@@ -1,0 +1,152 @@
+{% extends 'base.html' %}
+
+{% block title %}Nouveau Produit - ERP Copilot{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-plus me-2"></i>Nouveau Produit
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{% url 'product_list' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>Retour aux produits
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Informations du produit</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    {% if form.errors %}
+                    <div class="alert alert-danger">
+                        <strong>Erreur(s) dans le formulaire :</strong>
+                        <ul class="mb-0">
+                            {% for field, errors in form.errors.items %}
+                                {% for error in errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Référence *</label>
+                                {{ form.reference }}
+                                {% if form.reference.errors %}
+                                <div class="text-danger small">
+                                    {{ form.reference.errors }}
+                                </div>
+                                {% endif %}
+                                <div class="form-text">La référence doit être unique.</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Nom *</label>
+                                {{ form.name }}
+                                {% if form.name.errors %}
+                                <div class="text-danger small">
+                                    {{ form.name.errors }}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        {{ form.description }}
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Prix (€) *</label>
+                                {{ form.price }}
+                                {% if form.price.errors %}
+                                <div class="text-danger small">
+                                    {{ form.price.errors }}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Stock Actuel</label>
+                                {{ form.current_stock }}
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Stock Minimum</label>
+                                {{ form.min_stock }}
+                                <div class="form-text">Alerte si stock ≤ cette valeur</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{% url 'product_list' %}" class="btn btn-secondary me-md-2">Annuler</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-1"></i>Créer le produit
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header bg-light">
+                <h6 class="mb-0"><i class="fas fa-lightbulb me-2"></i>Conseils</h6>
+            </div>
+            <div class="card-body">
+                <small class="text-muted">
+                    <ul class="list-unstyled">
+                        <li class="mb-2">✓ Utilisez une référence unique et descriptive</li>
+                        <li class="mb-2">✓ Définissez un stock minimum réaliste</li>
+                        <li class="mb-2">✓ Le prix doit être HT (hors taxes)</li>
+                        <li class="mb-2">✓ Vous pourrez ajuster le stock plus tard</li>
+                        <li>✓ Une bonne description aide à identifier le produit</li>
+                    </ul>
+                </small>
+            </div>
+        </div>
+
+        <!-- Produits récemment créés -->
+        <div class="card mt-3">
+            <div class="card-header bg-light">
+                <h6 class="mb-0"><i class="fas fa-clock me-2"></i>Derniers produits</h6>
+            </div>
+            <div class="card-body">
+                {% with recent_products=products|slice:":3" %}
+                    {% if recent_products %}
+                        {% for product in recent_products %}
+                        <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                            <div>
+                                <strong class="small">{{ product.reference }}</strong>
+                                <div class="text-muted small">{{ product.name|truncatewords:3 }}</div>
+                            </div>
+                            <span class="badge bg-secondary small">{{ product.current_stock }}</span>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-muted small">Aucun produit créé récemment</div>
+                    {% endif %}
+                {% endwith %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

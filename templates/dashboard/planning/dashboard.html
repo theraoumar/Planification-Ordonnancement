@@ -1,0 +1,506 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Planification - ERP Copilot{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-calendar-alt me-2"></i>Tableau de Planification
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary me-2">
+            <i class="fas fa-arrow-left me-1"></i>Dashboard
+        </a>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addEventModal">
+            <i class="fas fa-plus me-1"></i>Nouvel Événement
+        </button>
+    </div>
+</div>
+
+<!-- KPI Rapides -->
+<div class="row mb-4">
+    <div class="col-xl-2 col-md-4 mb-3">
+        <div class="card border-left-primary shadow h-100">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                            TRS
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ trs }}%</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-tachometer-alt fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-2 col-md-4 mb-3">
+        <div class="card border-left-success shadow h-100">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                            Charge
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ workload }}%</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-chart-line fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-2 col-md-4 mb-3">
+        <div class="card border-left-warning shadow h-100">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                            En Production
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ in_production }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-cogs fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-2 col-md-4 mb-3">
+        <div class="card border-left-info shadow h-100">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                            À Planifier
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ to_schedule }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-clock fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-2 col-md-4 mb-3">
+        <div class="card border-left-danger shadow h-100">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
+                            En Retard
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ delayed }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-2 col-md-4 mb-3">
+        <div class="card border-left-secondary shadow h-100">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-secondary text-uppercase mb-1">
+                            Terminées
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ completed }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-check-circle fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Graphiques et Calendrier -->
+<div class="row">
+    <!-- Graphiques -->
+    <div class="col-lg-4">
+        <!-- TRS sur 7 jours -->
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-tachometer-alt me-2"></i>TRS sur 7 jours
+                </h6>
+            </div>
+            <div class="card-body">
+                <canvas id="trsChart" width="100%" height="200"></canvas>
+            </div>
+        </div>
+
+        <!-- Charge de production -->
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-success">
+                    <i class="fas fa-chart-pie me-2"></i>Répartition production
+                </h6>
+            </div>
+            <div class="card-body">
+                <canvas id="workloadChart" width="100%" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Calendrier -->
+    <div class="col-lg-8">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-calendar me-2"></i>Calendrier de Production
+                </h5>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-light" id="prevWeek">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" id="nextWeek">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" id="todayBtn">
+                        Aujourd'hui
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="calendar"></div>
+            </div>
+        </div>
+
+        <!-- Légende -->
+        <div class="card shadow mt-3">
+            <div class="card-body">
+                <h6 class="mb-3">Légende :</h6>
+                <div class="row text-center">
+                    <div class="col">
+                        <span class="badge bg-primary me-2">●</span>
+                        <small>Confirmée</small>
+                    </div>
+                    <div class="col">
+                        <span class="badge bg-warning me-2">●</span>
+                        <small>En production</small>
+                    </div>
+                    <div class="col">
+                        <span class="badge bg-success me-2">●</span>
+                        <small>Expédiée</small>
+                    </div>
+                    <div class="col">
+                        <span class="badge bg-danger me-2">●</span>
+                        <small>En retard</small>
+                    </div>
+                    <div class="col">
+                        <span class="badge bg-secondary me-2">●</span>
+                        <small>Maintenance</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal pour nouvel événement -->
+<div class="modal fade" id="addEventModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nouvel Événement</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'add_planning_event' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Type d'événement</label>
+                        <select name="event_type" class="form-select" required>
+                            <option value="maintenance">Maintenance</option>
+                            <option value="production">Production</option>
+                            <option value="meeting">Réunion</option>
+                            <option value="breakdown">Panne</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Titre</label>
+                        <input type="text" name="title" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea name="description" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Date début</label>
+                                <input type="date" name="start_date" class="form-control" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Date fin</label>
+                                <input type="date" name="end_date" class="form-control" required>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Créer l'événement</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Styles pour le calendrier -->
+<style>
+.calendar {
+    font-family: Arial, sans-serif;
+}
+
+.calendar-header {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.calendar-day-header {
+    padding: 10px;
+    text-align: center;
+    font-weight: bold;
+    border-right: 1px solid #dee2e6;
+}
+
+.calendar-day-header:last-child {
+    border-right: none;
+}
+
+.calendar-week {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    min-height: 120px;
+}
+
+.calendar-day {
+    border-right: 1px solid #dee2e6;
+    border-bottom: 1px solid #dee2e6;
+    padding: 5px;
+    position: relative;
+    min-height: 120px;
+}
+
+.calendar-day:last-child {
+    border-right: none;
+}
+
+.calendar-day.other-month {
+    background-color: #f8f9fa;
+    color: #6c757d;
+}
+
+.calendar-day.today {
+    background-color: #e3f2fd;
+}
+
+.day-number {
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.calendar-event {
+    font-size: 0.75rem;
+    padding: 2px 4px;
+    margin-bottom: 2px;
+    border-radius: 3px;
+    color: white;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.event-confirmed { background-color: #007bff; }
+.event-production { background-color: #ffc107; color: #000; }
+.event-shipped { background-color: #28a745; }
+.event-delayed { background-color: #dc3545; }
+.event-maintenance { background-color: #6c757d; }
+
+/* Responsive */
+@media (max-width: 768px) {
+    .calendar-day {
+        min-height: 80px;
+        font-size: 0.8rem;
+    }
+    
+    .calendar-event {
+        font-size: 0.7rem;
+        padding: 1px 2px;
+    }
+}
+</style>
+
+<!-- Scripts pour les graphiques et calendrier -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Données pour les graphiques (simulées)
+    const trsData = {
+        labels: ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'],
+        datasets: [{
+            label: 'TRS (%)',
+            data: [85, 88, 82, 90, 87, 0, 0],
+            borderColor: '#4e73df',
+            backgroundColor: 'rgba(78, 115, 223, 0.1)',
+            tension: 0.4,
+            fill: true
+        }]
+    };
+
+    const workloadData = {
+        labels: ['En production', 'Confirmées', 'À planifier', 'En retard'],
+        datasets: [{
+            data: [{{ in_production }}, {{ confirmed_orders }}, {{ to_schedule }}, {{ delayed }}],
+            backgroundColor: ['#ffc107', '#007bff', '#6c757d', '#dc3545']
+        }]
+    };
+
+    // Graphique TRS
+    const trsCtx = document.getElementById('trsChart').getContext('2d');
+    new Chart(trsCtx, {
+        type: 'line',
+        data: trsData,
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                        callback: function(value) {
+                            return value + '%';
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Graphique charge de travail
+    const workloadCtx = document.getElementById('workloadChart').getContext('2d');
+    new Chart(workloadCtx, {
+        type: 'doughnut',
+        data: workloadData,
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+
+    // Calendrier simple
+    let currentDate = new Date();
+    
+    function renderCalendar(date) {
+        const calendarEl = document.getElementById('calendar');
+        const firstDay = new Date(date.getFullYear(), date.getMonth(), 1);
+        const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+        const startDate = new Date(firstDay);
+        startDate.setDate(startDate.getDate() - startDate.getDay() + 1); // Lundi
+        
+        let calendarHTML = `
+            <div class="calendar-header">
+                <div class="calendar-day-header">Lun</div>
+                <div class="calendar-day-header">Mar</div>
+                <div class="calendar-day-header">Mer</div>
+                <div class="calendar-day-header">Jeu</div>
+                <div class="calendar-day-header">Ven</div>
+                <div class="calendar-day-header">Sam</div>
+                <div class="calendar-day-header">Dim</div>
+            </div>
+        `;
+        
+        // Générer les semaines
+        for (let week = 0; week < 6; week++) {
+            calendarHTML += '<div class="calendar-week">';
+            
+            for (let day = 0; day < 7; day++) {
+                const currentDate = new Date(startDate);
+                currentDate.setDate(startDate.getDate() + (week * 7 + day));
+                
+                const isToday = currentDate.toDateString() === new Date().toDateString();
+                const isOtherMonth = currentDate.getMonth() !== date.getMonth();
+                
+                calendarHTML += `
+                    <div class="calendar-day ${isOtherMonth ? 'other-month' : ''} ${isToday ? 'today' : ''}">
+                        <div class="day-number">${currentDate.getDate()}</div>
+                        ${renderEvents(currentDate)}
+                    </div>
+                `;
+            }
+            
+            calendarHTML += '</div>';
+        }
+        
+        calendarEl.innerHTML = calendarHTML;
+    }
+    
+    function renderEvents(date) {
+        const dateStr = date.toISOString().split('T')[0];
+        let eventsHTML = '';
+        
+        // Événements simulés (à remplacer par vos données réelles)
+        const events = [
+            { date: dateStr, title: 'CMD-2024-001', type: 'event-production' },
+            { date: dateStr, title: 'Maintenance', type: 'event-maintenance' }
+        ].filter(event => event.date === dateStr);
+        
+        events.forEach(event => {
+            eventsHTML += `<div class="calendar-event ${event.type}" title="${event.title}">${event.title}</div>`;
+        });
+        
+        return eventsHTML;
+    }
+    
+    // Navigation calendrier
+    document.getElementById('prevWeek').addEventListener('click', function() {
+        currentDate.setMonth(currentDate.getMonth() - 1);
+        renderCalendar(currentDate);
+    });
+    
+    document.getElementById('nextWeek').addEventListener('click', function() {
+        currentDate.setMonth(currentDate.getMonth() + 1);
+        renderCalendar(currentDate);
+    });
+    
+    document.getElementById('todayBtn').addEventListener('click', function() {
+        currentDate = new Date();
+        renderCalendar(currentDate);
+    });
+    
+    // Initialiser le calendrier
+    renderCalendar(currentDate);
+});
+</script>
+{% endblock %}

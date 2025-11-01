@@ -1,0 +1,225 @@
+{% extends 'base.html' %}
+
+{% block title %}Commande {{ order.order_number }} - ERP Copilot{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-file-invoice me-2"></i>Commande {{ order.order_number }}
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{% url 'order_list' %}" class="btn btn-outline-secondary me-2">
+            <i class="fas fa-arrow-left me-1"></i>Retour aux commandes
+        </a>
+        <a href="{% url 'edit_order' order.id %}" class="btn btn-outline-primary me-2">
+            <i class="fas fa-edit me-1"></i>Modifier
+        </a>
+        <a href="{% url 'delete_order' order.id %}" class="btn btn-outline-danger">
+            <i class="fas fa-trash me-1"></i>Supprimer
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Informations de la commande -->
+    <div class="col-md-4">
+        <div class="card shadow mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Informations commande</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <strong>Numéro:</strong><br>
+                    {{ order.order_number }}
+                </div>
+                <div class="mb-3">
+                    <strong>Client:</strong><br>
+                    {{ order.customer.name }}<br>
+                    <small class="text-muted">{{ order.customer.email }}</small>
+                </div>
+                <div class="mb-3">
+                    <strong>Statut:</strong><br>
+                    <span class="badge 
+                        {% if order.status == 'draft' %}bg-secondary
+                        {% elif order.status == 'confirmed' %}bg-primary
+                        {% elif order.status == 'in_production' %}bg-warning
+                        {% elif order.status == 'shipped' %}bg-success
+                        {% elif order.status == 'delivered' %}bg-info
+                        {% else %}bg-dark{% endif %}">
+                        {{ order.get_status_display }}
+                    </span>
+                </div>
+                <div class="mb-3">
+                    <strong>Date création:</strong><br>
+                    {{ order.created_at|date:"d/m/Y à H:i" }}
+                </div>
+                <div class="mb-3">
+                    <strong>Date livraison:</strong><br>
+                    <span class="{% if order.is_delayed %}text-danger fw-bold{% endif %}">
+                        {{ order.delivery_date|date:"d/m/Y" }}
+                        {% if order.is_delayed %}
+                        <i class="fas fa-exclamation-triangle ms-1" title="Commande en retard"></i>
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="mb-3">
+                    <strong>Total:</strong><br>
+                    <h4 class="text-primary">{{ order.total_amount }} €</h4>
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions rapides -->
+        <div class="card shadow">
+            <div class="card-header bg-light">
+                <h6 class="mb-0">Actions</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    {% if order.status == 'draft' %}
+                    <form method="post" action="{% url 'update_order_status' order.id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="status" value="confirmed">
+                        <button type="submit" class="btn btn-success btn-sm">
+                            <i class="fas fa-check me-1"></i>Confirmer la commande
+                        </button>
+                    </form>
+                    {% elif order.status == 'confirmed' %}
+                    <form method="post" action="{% url 'update_order_status' order.id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="status" value="in_production">
+                        <button type="submit" class="btn btn-warning btn-sm">
+                            <i class="fas fa-cogs me-1"></i>Démarrer la production
+                        </button>
+                    </form>
+                    {% elif order.status == 'in_production' %}
+                    <form method="post" action="{% url 'update_order_status' order.id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="status" value="shipped">
+                        <button type="submit" class="btn btn-info btn-sm">
+                            <i class="fas fa-shipping-fast me-1"></i>Marquer comme expédiée
+                        </button>
+                    </form>
+                    {% elif order.status == 'shipped' %}
+                    <form method="post" action="{% url 'update_order_status' order.id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="status" value="delivered">
+                        <button type="submit" class="btn btn-success btn-sm">
+                            <i class="fas fa-box me-1"></i>Marquer comme livrée
+                        </button>
+                    </form>
+                    {% endif %}
+                    
+                    {% if order.status != 'cancelled' %}
+                    <form method="post" action="{% url 'update_order_status' order.id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="status" value="cancelled">
+                        <button type="submit" class="btn btn-danger btn-sm" 
+                                onclick="return confirm('Êtes-vous sûr de vouloir annuler cette commande ?')">
+                            <i class="fas fa-times me-1"></i>Annuler la commande
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Produits de la commande -->
+    <div class="col-md-8">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Produits commandés</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Produit</th>
+                                <th>Référence</th>
+                                <th>Quantité</th>
+                                <th>Prix unitaire</th>
+                                <th>Total</th>
+                                <th>Stock disponible</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in order.items.all %}
+                            <tr>
+                                <td>
+                                    <strong>{{ item.product.name }}</strong>
+                                    {% if item.quantity > item.product.current_stock %}
+                                    <span class="badge bg-danger ms-1" title="Stock insuffisant">
+                                        <i class="fas fa-exclamation-triangle"></i>
+                                    </span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ item.product.reference }}</td>
+                                <td>{{ item.quantity }}</td>
+                                <td>{{ item.unit_price }} €</td>
+                                <td><strong>{{ item.total_price }} €</strong></td>
+                                <td>
+                                    <span class="{% if item.product.current_stock < item.quantity %}text-danger{% endif %}">
+                                        {{ item.product.current_stock }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-4">
+                                    Aucun produit dans cette commande.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="4" class="text-end"><strong>Sous-total:</strong></td>
+                                <td colspan="2"><strong>{{ order.total_amount }} €</strong></td>
+                            </tr>
+                            <tr>
+                                <td colspan="4" class="text-end">TVA (20%):</td>
+                                <td colspan="2">{{ order.total_amount|floatformat:2|default:0|add:0|multiply:0.2|floatformat:2 }} €</td>
+                            </tr>
+                            <tr class="table-primary">
+                                <td colspan="4" class="text-end"><strong>Total TTC:</strong></td>
+                                <td colspan="2"><strong>{{ order.total_amount|floatformat:2|default:0|add:0|multiply:1.2|floatformat:2 }} €</strong></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Informations client -->
+        <div class="card shadow mt-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">Informations client</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <strong>Nom:</strong><br>
+                        {{ order.customer.name }}
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Email:</strong><br>
+                        {{ order.customer.email }}
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-md-6">
+                        <strong>Téléphone:</strong><br>
+                        {{ order.customer.phone }}
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Adresse:</strong><br>
+                        {{ order.customer.address|linebreaks }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
