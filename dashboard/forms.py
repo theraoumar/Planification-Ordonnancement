@@ -83,3 +83,20 @@ class StockMovementForm(forms.ModelForm):
         if quantity <= 0:
             raise forms.ValidationError("La quantité doit être positive.")
         return quantity
+    
+class CustomerForm(forms.ModelForm):
+    class Meta:
+        model = Customer
+        fields = ['name', 'email', 'phone', 'address']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nom du client'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'email@exemple.com'}),
+            'phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '+212 XXX XXX XXX'}),
+            'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Adresse complète'}),
+        }
+        labels = {
+            'name': 'Nom du client',
+            'email': 'Email', 
+            'phone': 'Téléphone',
+            'address': 'Adresse',
+        }    

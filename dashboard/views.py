@@ -27,6 +27,94 @@ def dashboard(request):
 
 # ========== COMMANDES ==========
 @login_required
+def create_customer(request):
+    if request.method == 'POST':
+        form = CustomerForm(request.POST)
+        if form.is_valid():
+            customer = form.save()
+            messages.success(request, f'Client "{customer.name}" créé avec succès!')
+            return redirect('customer_list')
+    else:
+        form = CustomerForm()
+    
+    return render(request, 'dashboard/customers/create_customer.html', {'form': form})
+
+@login_required
+def customer_list(request):
+    customers = Customer.objects.all().order_by('name')
+    
+    search_query = request.GET.get('search', '')
+    if search_query:
+        customers = customers.filter(
+            Q(name__icontains=search_query) |
+            Q(email__icontains=search_query)
+        )
+    
+    return render(request, 'dashboard/customers/customer_list.html', {
+        'customers': customers,
+        'search_query': search_query,
+    })
+    
+@login_required
+def create_order_for_customer(request, customer_id):
+    """Crée une nouvelle commande pour un client spécifique"""
+    customer = get_object_or_404(Customer, id=customer_id)
+    
+    if request.method == 'POST':
+        form = OrderForm(request.POST)
+        if form.is_valid():
+            order = form.save(commit=False)
+            
+            # Générer un numéro de commande automatique
+            last_order = Order.objects.order_by('-id').first()
+            if last_order:
+                last_number = int(last_order.order_number.split('-')[-1])
+                new_number = last_number + 1
+            else:
+                new_number = 1
+            order.order_number = f"CMD-{timezone.now().year}-{new_number:04d}"
+            
+            order.save()
+            
+            # Gérer les produits de la commande
+            products = request.POST.getlist('products')
+            quantities = request.POST.getlist('quantities')
+            prices = request.POST.getlist('prices')
+            
+            total_amount = 0
+            for product_id, quantity, price in zip(products, quantities, prices):
+                if product_id and quantity and price:
+                    product = Product.objects.get(id=product_id)
+                    quantity_int = int(quantity)
+                    price_float = float(price)
+                    
+                    OrderItem.objects.create(
+                        order=order,
+                        product=product,
+                        quantity=quantity_int,
+                        unit_price=price_float
+                    )
+                    
+                    total_amount += quantity_int * price_float
+            
+            # Mettre à jour le total de la commande
+            order.total_amount = total_amount
+            order.save()
+            
+            messages.success(request, f'Commande {order.order_number} créée pour {customer.name}!')
+            return redirect('order_list')
+    else:
+        # Pré-remplir le formulaire avec le client
+        form = OrderForm(initial={'customer': customer})
+    
+    return render(request, 'dashboard/orders/create_order.html', {
+        'form': form,
+        'customer': customer,
+        'products': Product.objects.all(),
+        'recent_orders': Order.objects.select_related('customer').order_by('-created_at')[:5]
+    })    
+    
+@login_required
 def order_list(request):
     orders = Order.objects.select_related('customer').all().order_by('-created_at')
     
@@ -67,6 +155,17 @@ def order_list(request):
 
 @login_required
 def create_order(request):
+    # Vérifier si un client est spécifié dans l'URL
+    customer_id = request.GET.get('customer')
+    initial_data = {}
+    
+    if customer_id:
+        try:
+            customer = Customer.objects.get(id=customer_id)
+            initial_data['customer'] = customer
+        except Customer.DoesNotExist:
+            pass
+    
     if request.method == 'POST':
         form = OrderForm(request.POST)
         if form.is_valid():
@@ -109,7 +208,7 @@ def create_order(request):
             messages.success(request, f'Commande {order.order_number} créée avec succès!')
             return redirect('order_list')
     else:
-        form = OrderForm()
+        form = OrderForm(initial=initial_data)
     
     return render(request, 'dashboard/orders/create_order.html', {
         'form': form,

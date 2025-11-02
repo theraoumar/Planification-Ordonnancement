@@ -222,34 +222,41 @@
                 <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" 
                 href="{% url 'dashboard' %}">
                     <i class="fas fa-home"></i>
-                    🏠 Dashboard
+                    Dashboard
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if 'customers' in request.path %}active{% endif %}" 
+                href="{% url 'customer_list' %}">
+                    <i class="fas fa-users"></i>
+                    Clients
                 </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link {% if 'orders' in request.path %}active{% endif %}" 
                 href="{% url 'order_list' %}">
                     <i class="fas fa-shopping-cart"></i>
-                    📋 Commandes
+                    Commandes
                 </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link {% if 'products' in request.path or 'stock' in request.path %}active{% endif %}" 
                 href="{% url 'product_list' %}">
                     <i class="fas fa-box"></i>
-                    📦 Produits & Stock
+                    Produits & Stock
                 </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link {% if 'planning' in request.path %}active{% endif %}" 
                 href="{% url 'planning_dashboard' %}">
                     <i class="fas fa-calendar-alt"></i>
-                    🗓️ Planification
+                    Planification
                 </a>
             </li>
                 <li class="nav-item mt-3">
                     <a class="nav-link text-success" href="#">
                         <i class="fas fa-robot"></i>
-                        🤖 Copilot
+                        Copilot
                     </a>
                 </li>
             </ul>

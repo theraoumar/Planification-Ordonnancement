@@ -7,6 +7,10 @@ urlpatterns = [
     path('', views.dashboard, name='dashboard'),
     
     # Commandes - TOUT regrouper ici
+    # Clients
+    path('customers/', views.customer_list, name='customer_list'),
+    path('customers/new/', views.create_customer, name='create_customer'),
+
     path('orders/', views.order_list, name='order_list'),
     path('orders/new/', views.create_order, name='create_order'),
     path('orders/<int:order_id>/', views.order_detail, name='order_detail'),
