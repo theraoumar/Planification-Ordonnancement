@@ -133,15 +133,15 @@
 <div class="row">
     <!-- Graphiques -->
     <div class="col-lg-4">
-        <!-- TRS sur 7 jours -->
+        <!-- Commandes par statut -->
         <div class="card shadow mb-4">
             <div class="card-header py-3">
                 <h6 class="m-0 font-weight-bold text-primary">
-                    <i class="fas fa-tachometer-alt me-2"></i>TRS sur 7 jours
+                    <i class="fas fa-chart-bar me-2"></i>Commandes par Statut
                 </h6>
             </div>
             <div class="card-body">
-                <canvas id="trsChart" width="100%" height="200"></canvas>
+                <canvas id="ordersChart" width="100%" height="200"></canvas>
             </div>
         </div>
 
@@ -154,6 +154,30 @@
             </div>
             <div class="card-body">
                 <canvas id="workloadChart" width="100%" height="200"></canvas>
+            </div>
+        </div>
+
+        <!-- Commandes à venir -->
+        <div class="card shadow">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-info">
+                    <i class="fas fa-list me-2"></i>Commandes cette semaine
+                </h6>
+            </div>
+            <div class="card-body">
+                {% for order in this_week_orders %}
+                <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                    <div>
+                        <strong class="small">{{ order.order_number }}</strong>
+                        <div class="text-muted small">{{ order.customer.name }}</div>
+                    </div>
+                    <span class="badge {% if order.is_delayed %}bg-danger{% else %}bg-primary{% endif %} small">
+                        {{ order.delivery_date|date:"d/m" }}
+                    </span>
+                </div>
+                {% empty %}
+                <div class="text-muted small text-center">Aucune commande cette semaine</div>
+                {% endfor %}
             </div>
         </div>
     </div>
@@ -182,32 +206,33 @@
             </div>
         </div>
 
-        <!-- Légende -->
+        <!-- Commandes en retard -->
         <div class="card shadow mt-3">
+            <div class="card-header bg-danger text-white">
+                <h6 class="mb-0">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Commandes en Retard ({{ delayed_orders|length }})
+                </h6>
+            </div>
             <div class="card-body">
-                <h6 class="mb-3">Légende :</h6>
-                <div class="row text-center">
-                    <div class="col">
-                        <span class="badge bg-primary me-2">●</span>
-                        <small>Confirmée</small>
-                    </div>
-                    <div class="col">
-                        <span class="badge bg-warning me-2">●</span>
-                        <small>En production</small>
-                    </div>
-                    <div class="col">
-                        <span class="badge bg-success me-2">●</span>
-                        <small>Expédiée</small>
-                    </div>
-                    <div class="col">
-                        <span class="badge bg-danger me-2">●</span>
-                        <small>En retard</small>
-                    </div>
-                    <div class="col">
-                        <span class="badge bg-secondary me-2">●</span>
-                        <small>Maintenance</small>
+                {% for order in delayed_orders %}
+                <div class="alert alert-warning py-2 mb-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ order.order_number }}</strong> - {{ order.customer.name }}
+                            <br>
+                            <small>Retard depuis le {{ order.delivery_date|date:"d/m/Y" }}</small>
+                        </div>
+                        <a href="{% url 'order_detail' order.id %}" class="btn btn-sm btn-outline-danger">
+                            Voir
+                        </a>
                     </div>
                 </div>
+                {% empty %}
+                <div class="text-center text-muted">
+                    <i class="fas fa-check-circle fa-2x mb-2 text-success"></i><br>
+                    Aucune commande en retard !
+                </div>
+                {% endfor %}
             </div>
         </div>
     </div>
@@ -338,6 +363,7 @@
 .event-shipped { background-color: #28a745; }
 .event-delayed { background-color: #dc3545; }
 .event-maintenance { background-color: #6c757d; }
+.event-draft { background-color: #6c757d; }
 
 /* Responsive */
 @media (max-width: 768px) {
@@ -357,16 +383,22 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Données pour les graphiques (simulées)
-    const trsData = {
-        labels: ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'],
+    // Données RÉELLES pour les graphiques
+    const ordersData = {
+        labels: ['Brouillons', 'Confirmées', 'En production', 'Expédiées', 'Livrées', 'Annulées'],
         datasets: [{
-            label: 'TRS (%)',
-            data: [85, 88, 82, 90, 87, 0, 0],
-            borderColor: '#4e73df',
-            backgroundColor: 'rgba(78, 115, 223, 0.1)',
-            tension: 0.4,
-            fill: true
+            label: 'Nombre de commandes',
+            data: [
+                {{ orders_by_status.draft }},
+                {{ orders_by_status.confirmed }},
+                {{ orders_by_status.in_production }},
+                {{ orders_by_status.shipped }},
+                {{ orders_by_status.delivered }},
+                {{ orders_by_status.cancelled }}
+            ],
+            backgroundColor: [
+                '#6c757d', '#007bff', '#ffc107', '#28a745', '#20c997', '#dc3545'
+            ]
         }]
     };
 
@@ -378,11 +410,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }]
     };
 
-    // Graphique TRS
-    const trsCtx = document.getElementById('trsChart').getContext('2d');
-    new Chart(trsCtx, {
-        type: 'line',
-        data: trsData,
+    // Graphique commandes par statut
+    const ordersCtx = document.getElementById('ordersChart').getContext('2d');
+    new Chart(ordersCtx, {
+        type: 'bar',
+        data: ordersData,
         options: {
             responsive: true,
             plugins: {
@@ -393,11 +425,8 @@ document.addEventListener('DOMContentLoaded', function() {
             scales: {
                 y: {
                     beginAtZero: true,
-                    max: 100,
                     ticks: {
-                        callback: function(value) {
-                            return value + '%';
-                        }
+                        stepSize: 1
                     }
                 }
             }
@@ -419,7 +448,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Calendrier simple
+    // Calendrier avec données RÉELLES
     let currentDate = new Date();
     
     function renderCalendar(date) {
@@ -470,14 +499,32 @@ document.addEventListener('DOMContentLoaded', function() {
         const dateStr = date.toISOString().split('T')[0];
         let eventsHTML = '';
         
-        // Événements simulés (à remplacer par vos données réelles)
-        const events = [
-            { date: dateStr, title: 'CMD-2024-001', type: 'event-production' },
-            { date: dateStr, title: 'Maintenance', type: 'event-maintenance' }
-        ].filter(event => event.date === dateStr);
+        // Commandes de la base de données pour cette date
+        const ordersForDate = {{ orders_json|safe }}.filter(order => 
+            order.delivery_date === dateStr || 
+            (order.start_date === dateStr && order.end_date && order.end_date >= dateStr)
+        );
         
-        events.forEach(event => {
-            eventsHTML += `<div class="calendar-event ${event.type}" title="${event.title}">${event.title}</div>`;
+        // Événements de planification pour cette date
+        const eventsForDate = {{ events_json|safe }}.filter(event => 
+            event.start_date === dateStr || 
+            (event.start_date <= dateStr && event.end_date >= dateStr)
+        );
+        
+        // Afficher les commandes
+        ordersForDate.forEach(order => {
+            let eventClass = 'event-production';
+            if (order.status === 'confirmed') eventClass = 'event-confirmed';
+            if (order.status === 'shipped') eventClass = 'event-shipped';
+            if (order.status === 'delayed') eventClass = 'event-delayed';
+            if (order.status === 'draft') eventClass = 'event-draft';
+            
+            eventsHTML += `<div class="calendar-event ${eventClass}" title="${order.order_number} - ${order.customer}">${order.order_number}</div>`;
+        });
+        
+        // Afficher les événements
+        eventsForDate.forEach(event => {
+            eventsHTML += `<div class="calendar-event event-maintenance" title="${event.title}">${event.title}</div>`;
         });
         
         return eventsHTML;

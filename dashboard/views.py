@@ -285,21 +285,80 @@ def delete_order(request, order_id):
 @login_required
 def update_order_status(request, order_id):
     order = get_object_or_404(Order, id=order_id)
+    old_status = order.status
     
     if request.method == 'POST':
         new_status = request.POST.get('status')
+        
         if new_status in dict(Order.STATUS_CHOICES):
-            old_status = order.get_status_display()
+            
+            # ========== GESTION STOCK - CONFIRMATION ==========
+            if new_status == 'confirmed' and old_status != 'confirmed':
+                # Vérifier d'abord si le stock est suffisant
+                stock_problems = []
+                for item in order.items.all():
+                    if item.quantity > item.product.current_stock:
+                        stock_problems.append(
+                            f"{item.product.reference}: stock {item.product.current_stock}, besoin {item.quantity}"
+                        )
+                
+                if stock_problems:
+                    messages.error(request, 
+                        f"❌ Stock insuffisant pour confirmer la commande:\n" +
+                        "\n".join(stock_problems)
+                    )
+                    return redirect('order_detail', order_id=order.id)
+                
+                # Diminuer le stock des produits
+                for item in order.items.all():
+                    product = item.product
+                    product.current_stock -= item.quantity
+                    product.save()
+                    
+                    # Enregistrer le mouvement de stock
+                    StockMovement.objects.create(
+                        product=product,
+                        movement_type='out',
+                        quantity=item.quantity,
+                        reason=f'Commande {order.order_number}',
+                        user=request.user
+                    )
+                
+                messages.success(request, f"✅ Stock diminué pour {order.order_number}")
+            
+            # ========== GESTION STOCK - ANNULATION ==========
+            elif new_status == 'cancelled' and old_status in ['confirmed', 'in_production']:
+                # Restaurer le stock des produits
+                for item in order.items.all():
+                    product = item.product
+                    product.current_stock += item.quantity
+                    product.save()
+                    
+                    # Enregistrer le mouvement de stock
+                    StockMovement.objects.create(
+                        product=product,
+                        movement_type='in',
+                        quantity=item.quantity,
+                        reason=f'Annulation commande {order.order_number}',
+                        user=request.user
+                    )
+                
+                messages.success(request, f"✅ Stock restauré pour {order.order_number}")
+            
+            # Changer le statut de la commande
             order.status = new_status
             order.save()
-            messages.success(request, f'Statut de la commande {order.order_number} changé de "{old_status}" à "{order.get_status_display()}"')
+            
+            messages.success(request, 
+                f'📦 Statut de {order.order_number} changé : "{order.get_status_display(old_status)}" → "{order.get_status_display()}"'
+            )
     
     return redirect('order_detail', order_id=order.id)
 
 # ========== PRODUITS & STOCK ==========
 @login_required
 def product_list(request):
-    products = Product.objects.all().order_by('reference')
+    products = Product.objects.filter(is_active=True).order_by('reference')
     
     # Filtrer par recherche
     search_query = request.GET.get('search', '')
@@ -361,13 +420,18 @@ def edit_product(request, product_id):
 def delete_product(request, product_id):
     product = get_object_or_404(Product, id=product_id)
     
-    # Compter les commandes utilisant ce produit
-    order_items_count = OrderItem.objects.filter(product=product).count()
+    # Vérifier si le produit est utilisé dans des commandes NON ANNULÉES
+    order_items_count = OrderItem.objects.filter(
+        product=product,
+        order__status__in=['draft', 'confirmed', 'in_production', 'shipped']
+    ).count()
     
     if request.method == 'POST':
-        # Vérifier si le produit est utilisé dans des commandes
         if order_items_count > 0:
-            messages.error(request, f'Impossible de supprimer {product.reference} car il est utilisé dans {order_items_count} commande(s).')
+            messages.error(request, 
+                f'Impossible de supprimer {product.reference} car il est utilisé dans {order_items_count} commande(s) active(s). '
+                f'Annulez d\'abord ces commandes ou archivez le produit.'
+            )
         else:
             product_name = product.reference
             product.delete()
@@ -474,6 +538,94 @@ def planning_dashboard(request):
         'delayed': delayed,
         'completed': completed,
         'total_orders': total_orders,
+    }
+    return render(request, 'dashboard/planning/dashboard.html', context)
+
+
+@login_required
+def planning_dashboard(request):
+    from django.db.models import Count
+    import json
+    from datetime import datetime, timedelta
+    
+    # Commandes pour le calendrier
+    orders = Order.objects.select_related('customer').filter(
+        status__in=['confirmed', 'in_production', 'shipped']
+    ).order_by('delivery_date')
+    
+    # Commandes cette semaine
+    today = timezone.now().date()
+    start_of_week = today - timedelta(days=today.weekday())
+    end_of_week = start_of_week + timedelta(days=6)
+    
+    this_week_orders = Order.objects.filter(
+        delivery_date__range=[start_of_week, end_of_week],
+        status__in=['confirmed', 'in_production']
+    ).select_related('customer')
+    
+    # Commandes en retard
+    delayed_orders = Order.objects.filter(
+        delivery_date__lt=today,
+        status__in=['confirmed', 'in_production']
+    ).select_related('customer')
+    
+    # KPI calculés
+    total_orders = Order.objects.count()
+    in_production = Order.objects.filter(status='in_production').count()
+    confirmed_orders = Order.objects.filter(status='confirmed').count()
+    to_schedule = Order.objects.filter(status='draft').count()
+    delayed = delayed_orders.count()
+    completed = Order.objects.filter(status__in=['shipped', 'delivered']).count()
+    
+    # Commandes par statut
+    orders_by_status = Order.objects.values('status').annotate(count=Count('id'))
+    orders_status_dict = {item['status']: item['count'] for item in orders_by_status}
+    
+    # Calcul TRS simulé
+    trs = calculate_trs()
+    
+    # Calcul charge de travail
+    workload = calculate_workload()
+    
+    # Événements de planification
+    events = PlanningEvent.objects.all()
+    
+    # Préparer les données pour le calendrier
+    orders_data = []
+    for order in orders:
+        orders_data.append({
+            'order_number': order.order_number,
+            'customer': order.customer.name,
+            'delivery_date': order.delivery_date.isoformat(),
+            'status': order.status,
+            'is_delayed': order.is_delayed
+        })
+    
+    events_data = []
+    for event in events:
+        events_data.append({
+            'title': event.title,
+            'start_date': event.start_date.isoformat(),
+            'end_date': event.end_date.isoformat(),
+            'event_type': event.event_type
+        })
+    
+    context = {
+        'orders': orders,
+        'this_week_orders': this_week_orders,
+        'delayed_orders': delayed_orders,
+        'events': events,
+        'trs': trs,
+        'workload': workload,
+        'in_production': in_production,
+        'confirmed_orders': confirmed_orders,
+        'to_schedule': to_schedule,
+        'delayed': delayed,
+        'completed': completed,
+        'total_orders': total_orders,
+        'orders_by_status': orders_status_dict,
+        'orders_json': json.dumps(orders_data),
+        'events_json': json.dumps(events_data),
     }
     return render(request, 'dashboard/planning/dashboard.html', context)
 
@@ -880,3 +1032,16 @@ def calculate_on_time_rate():
     if total_delivered > 0:
         return round((on_time_delivered / total_delivered) * 100, 1)
     return 100.0
+
+
+@login_required
+def archive_product(request, product_id):
+    """Archive un produit au lieu de le supprimer"""
+    product = get_object_or_404(Product, id=product_id)
+    
+    if request.method == 'POST':
+        product.archive()
+        messages.success(request, f'Produit {product.reference} archivé avec succès!')
+        return redirect('product_list')
+    
+    return render(request, 'dashboard/products/archive_product.html', {'product': product})

@@ -39,6 +39,38 @@ class Product(models.Model):
     @property
     def is_low_stock(self):
         return self.current_stock <= self.min_stock
+    
+    @property
+    def reserved_quantity(self):
+        """Quantité réservée dans les commandes actives"""
+        return OrderItem.objects.filter(
+            product=self,
+            order__status__in=['confirmed', 'in_production']
+        ).aggregate(total=Sum('quantity'))['total'] or 0
+    
+    @property
+    def available_stock(self):
+        """Stock disponible (stock actuel - réservé)"""
+        return self.current_stock - self.reserved_quantity
+    
+    def can_fulfill_order(self, quantity):
+        """Vérifie si le stock peut satisfaire une commande"""
+        return self.available_stock >= quantity
+    
+    is_active = models.BooleanField(default=True)
+    archived_at = models.DateTimeField(null=True, blank=True)
+    
+    def archive(self):
+        """Archive le produit au lieu de le supprimer"""
+        self.is_active = False
+        self.archived_at = timezone.now()
+        self.save()
+    
+    def restore(self):
+        """Restaure un produit archivé"""
+        self.is_active = True
+        self.archived_at = None
+        self.save()
 
 class Order(models.Model):
     STATUS_CHOICES = [
@@ -63,6 +95,78 @@ class Order(models.Model):
     @property
     def is_delayed(self):
         return self.delivery_date < timezone.now().date() and self.status not in ['shipped', 'delivered', 'cancelled']
+    
+    def update_stock_on_confirm(self):
+        """Diminue le stock quand une commande est confirmée"""
+        if self.status == 'confirmed':
+            for item in self.items.all():
+                if item.product.current_stock >= item.quantity:
+                    item.product.current_stock -= item.quantity
+                    item.product.save()
+                    
+                    # Enregistrer le mouvement de stock
+                    StockMovement.objects.create(
+                        product=item.product,
+                        movement_type='out',
+                        quantity=item.quantity,
+                        reason=f'Commande {self.order_number}',
+                        user=self.customer  # ou l'utilisateur connecté
+                    )
+                else:
+                    raise ValueError(f"Stock insuffisant pour {item.product.reference}")
+    
+    def restore_stock_on_cancel(self):
+        """Restaure le stock quand une commande est annulée"""
+        if self.status == 'cancelled':
+            for item in self.items.all():
+                item.product.current_stock += item.quantity
+                item.product.save()
+                
+                # Enregistrer le mouvement de stock
+                StockMovement.objects.create(
+                    product=item.product,
+                    movement_type='in',
+                    quantity=item.quantity,
+                    reason=f'Annulation commande {self.order_number}',
+                    user=self.customer
+                )
+    
+    def save(self, *args, **kwargs):
+        """Override save pour gérer automatiquement les stocks"""
+        old_status = None
+        if self.pk:
+            old_status = Order.objects.get(pk=self.pk).status
+        
+        super().save(*args, **kwargs)
+        
+        # Gestion automatique des stocks
+        try:
+            if old_status != self.status:
+                if self.status == 'confirmed' and old_status != 'confirmed':
+                    self.update_stock_on_confirm()
+                elif self.status == 'cancelled' and old_status in ['confirmed', 'in_production']:
+                    self.restore_stock_on_cancel()
+        except Exception as e:
+            # En cas d'erreur, on revert le statut
+            self.status = old_status
+            self.save()
+            raise e
+        
+    @property
+    def tva_amount(self):
+        """Calcule la TVA simplement"""
+        try:
+            return float(self.total_amount) * 0.20
+        except (TypeError, ValueError):
+            return 0.0
+    
+    @property
+    def total_ttc(self):
+        """Calcule le total TTC simplement"""
+        try:
+            return float(self.total_amount) * 1.20
+        except (TypeError, ValueError):
+            return 0.0    
 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
@@ -74,8 +178,14 @@ class OrderItem(models.Model):
         return f"{self.order.order_number} - {self.product.name}"
     
     @property
-    def total_price(self):
-        return self.quantity * self.unit_price
+    def tva_amount(self):
+        """Calcule le montant de la TVA (20%)"""
+        return round(float(self.total_amount) * 0.20, 2)
+    
+    @property
+    def total_ttc(self):
+        """Calcule le total TTC"""
+        return round(float(self.total_amount) * 1.20, 2)
 
 class StockMovement(models.Model):
     MOVEMENT_TYPES = [

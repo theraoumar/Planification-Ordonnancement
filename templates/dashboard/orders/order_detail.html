@@ -123,6 +123,17 @@
                 </div>
             </div>
         </div>
+        <!-- Après les actions rapides, ajoutez ceci -->
+            {% if messages %}
+            <div class="mt-3">
+                {% for message in messages %}
+                <div class="alert alert-info alert-dismissible fade show">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
     </div>
 
     <!-- Produits de la commande -->
@@ -175,16 +186,16 @@
                         </tbody>
                         <tfoot>
                             <tr>
-                                <td colspan="4" class="text-end"><strong>Sous-total:</strong></td>
-                                <td colspan="2"><strong>{{ order.total_amount }} €</strong></td>
+                                <td colspan="4" class="text-end"><strong>Sous-total HT:</strong></td>
+                                <td colspan="2"><strong>{{ order.total_amount|floatformat:2 }} €</strong></td>
                             </tr>
                             <tr>
                                 <td colspan="4" class="text-end">TVA (20%):</td>
-                                <td colspan="2">{{ order.total_amount|floatformat:2|default:0|add:0|multiply:0.2|floatformat:2 }} €</td>
+                                <td colspan="2">{{ order.tva_amount|floatformat:2 }} €</td>
                             </tr>
                             <tr class="table-primary">
                                 <td colspan="4" class="text-end"><strong>Total TTC:</strong></td>
-                                <td colspan="2"><strong>{{ order.total_amount|floatformat:2|default:0|add:0|multiply:1.2|floatformat:2 }} €</strong></td>
+                                <td colspan="2"><strong>{{ order.total_ttc|floatformat:2 }} €</strong></td>
                             </tr>
                         </tfoot>
                     </table>

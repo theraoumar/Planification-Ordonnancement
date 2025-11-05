@@ -24,6 +24,7 @@ urlpatterns = [
     path('products/<int:product_id>/edit/', views.edit_product, name='edit_product'),
     path('products/<int:product_id>/delete/', views.delete_product, name='delete_product'),
     path('products/<int:product_id>/adjust-stock/', views.adjust_stock, name='adjust_stock'),
+    path('products/<int:product_id>/archive/', views.archive_product, name='archive_product'),
     path('stock/movements/', views.stock_movements, name='stock_movements'),
     
     # Planning

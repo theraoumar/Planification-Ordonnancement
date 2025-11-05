@@ -46,8 +46,32 @@
                 {% if order_items_count > 0 %}
                 <div class="alert alert-warning">
                     <i class="fas fa-exclamation-circle me-2"></i>
-                    <strong>Attention !</strong> Ce produit est utilisé dans {{ order_items_count }} commande(s). 
-                    La suppression n'est pas possible.
+                    <strong>Attention !</strong> Ce produit est utilisé dans {{ order_items_count }} commande(s) active(s).
+                    
+                    <div class="mt-2">
+                        <strong>Commandes concernées :</strong>
+                        <ul class="mb-0 mt-1">
+                            {% for item in product.orderitem_set.all %}
+                                {% if item.order.status in 'draft,confirmed,in_production,shipped' %}
+                                <li>
+                                    {{ item.order.order_number }} - {{ item.order.customer.name }}
+                                    (Quantité: {{ item.quantity }}, Statut: {{ item.order.get_status_display }})
+                                </li>
+                                {% endif %}
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    
+                    <div class="mt-2">
+                        <small>
+                            Pour supprimer ce produit, vous devez d'abord :
+                            <ul class="mb-0">
+                                <li>Annuler les commandes actives qui l'utilisent</li>
+                                <li>Ou changer les produits dans ces commandes</li>
+                                <li>Ou archiver le produit au lieu de le supprimer</li>
+                            </ul>
+                        </small>
+                    </div>
                 </div>
                 {% endif %}
 
