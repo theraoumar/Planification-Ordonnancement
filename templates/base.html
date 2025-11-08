@@ -202,6 +202,25 @@
         .text-gray-300 {
             color: #dddfeb !important;
         }
+
+        /* Style pour le lien ERP Copilot */
+        .nav-link.erp-copilot {
+            background: linear-gradient(135deg, #1cc88a, #13855c);
+            color: white !important;
+            margin: 10px 15px;
+            border-radius: 8px;
+            border-left: 3px solid #0f6e4a !important;
+        }
+        
+        .nav-link.erp-copilot:hover {
+            background: linear-gradient(135deg, #17a673, #0f6e4a);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        .nav-link.erp-copilot i {
+            color: white !important;
+        }
     </style>
 </head>
 <body>
@@ -253,12 +272,22 @@
                     Planification
                 </a>
             </li>
-                <li class="nav-item mt-3">
-                    <a class="nav-link text-success" href="#">
-                        <i class="fas fa-robot"></i>
-                        Copilot
-                    </a>
-                </li>
+            
+            <!-- Lien ERP Copilot - Nouvelle section -->
+            <li class="nav-item mt-4">
+                <a class="nav-link erp-copilot" href="{% url 'erp_copilot' %}">
+                    <i class="fas fa-rocket"></i>
+                    ERP Copilot
+                </a>
+            </li>
+            
+            <!-- Ancien lien Copilot conservé -->
+            <li class="nav-item">
+                <a class="nav-link text-info" href="{% url 'dashboard' %}#ai-assistant">
+                    <i class="fas fa-robot"></i>
+                    Assistant AI
+                </a>
+            </li>
             </ul>
             
             <!-- User info en bas -->
@@ -290,7 +319,7 @@
         {% endblock %}
     </main>
 
-    <!-- Copilot Assistant -->
+    <!-- Copilot Assistant (conservé pour le dashboard) -->
     <div class="position-fixed bottom-0 end-0 m-3" style="z-index: 1050;">
         <div class="toast show" role="alert">
             <div class="toast-header bg-primary text-white">
@@ -372,3 +401,5 @@
 </script>
 </body>
 </html>
+<!-- À la fin de base.html, avant </body> -->
+{% block extra_js %}{% endblock %}

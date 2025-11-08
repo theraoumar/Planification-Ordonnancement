@@ -32,9 +32,15 @@ urlpatterns = [
     path('planning/add-event/', views.add_planning_event, name='add_planning_event'),
     
    # Assistant IA
-   path('assistant/', views.ai_assistant, name='ai_assistant'),
-   path('assistant/ask/', views.ask_ai_assistant, name='ask_ai_assistant'),
-   path('assistant/analyze/', views.run_ai_analysis, name='run_ai_analysis'),
+    path('erp-copilot/', views.erp_copilot, name='erp_copilot'),
+    path('copilot/analyze/', views.copilot_analyze, name='copilot_analyze'),
+    path('copilot/suggest-action/', views.copilot_suggest_action, name='copilot_suggest_action'),
+    path('copilot/execute-action/', views.copilot_execute_action, name='copilot_execute_action'),
+    
+    # URLs Assistant AI (existantes)
+    path('ai-assistant/', views.ai_assistant, name='ai_assistant'),
+    path('ask-ai-assistant/', views.ask_ai_assistant, name='ask_ai_assistant'),
+    path('run-ai-analysis/', views.run_ai_analysis, name='run_ai_analysis'),
     
     # Auth
     path('accounts/login/', LoginView.as_view(template_name='dashboard/login.html'), name='login'),

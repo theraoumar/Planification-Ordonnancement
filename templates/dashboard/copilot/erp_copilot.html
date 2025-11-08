@@ -1,0 +1,697 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}ERP Copilot - Assistant Intelligent{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-robot text-primary me-2"></i>ERP Copilot
+        </h1>
+        <div class="d-flex">
+            <button class="btn btn-primary me-2" onclick="runQuickAnalysis()">
+                <i class="fas fa-sync-alt me-2"></i>Actualiser l'analyse
+            </button>
+            <button class="btn btn-success" onclick="generateReport()">
+                <i class="fas fa-file-pdf me-2"></i>Générer rapport
+            </button>
+        </div>
+    </div>
+
+    <!-- Statistiques rapides -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Insights Automatiques
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ copilot_stats.total_insights }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-lightbulb fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Alertes Critiques
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ copilot_stats.critical_alerts }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Opportunités
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ copilot_stats.optimization_opportunities }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-chart-line fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Activités Récentes
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ copilot_stats.recent_activities|length }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-history fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Insights Automatiques -->
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white py-3">
+                    <h6 class="m-0 font-weight-bold">
+                        <i class="fas fa-brain me-2"></i>Insights Automatiques
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div id="insightsContainer">
+                        {% for insight in automatic_insights %}
+                        <div class="alert alert-{% if insight.type == 'critical' %}danger{% elif insight.type == 'warning' %}warning{% else %}info{% endif %} d-flex align-items-center mb-3">
+                            <i class="{{ insight.icon }} me-3 fa-lg"></i>
+                            <div class="flex-grow-1">
+                                <h6 class="alert-heading mb-1">{{ insight.title }}</h6>
+                                <p class="mb-1 small">{{ insight.description }}</p>
+                            </div>
+                            <button class="btn btn-sm btn-outline-{% if insight.type == 'critical' %}danger{% elif insight.type == 'warning' %}warning{% else %}info{% endif %}" 
+                                    onclick="handleInsightAction('{{ insight.action }}')">
+                                Agir
+                            </button>
+                        </div>
+                        {% empty %}
+                        <div class="text-center text-muted py-4">
+                            <i class="fas fa-check-circle fa-3x mb-3 text-success"></i>
+                            <p>Aucun insight critique détecté. Tout semble sous contrôle !</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analyse en Temps Réel -->
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow">
+                <div class="card-header bg-success text-white py-3">
+                    <h6 class="m-0 font-weight-bold">
+                        <i class="fas fa-chart-bar me-2"></i>Analyse en Temps Réel
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-4">
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-outline-primary" onclick="runAnalysis('overview')">
+                                Vue Globale
+                            </button>
+                            <button type="button" class="btn btn-outline-warning" onclick="runAnalysis('stock')">
+                                Stock
+                            </button>
+                            <button type="button" class="btn btn-outline-info" onclick="runAnalysis('production')">
+                                Production
+                            </button>
+                            <button type="button" class="btn btn-outline-success" onclick="runAnalysis('financial')">
+                                Finances
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="analysisResults" class="mt-3">
+                        <div class="text-center text-muted py-4">
+                            <i class="fas fa-chart-line fa-2x mb-3"></i>
+                            <p>Sélectionnez un type d'analyse pour commencer</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Activités Récentes -->
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow">
+                <div class="card-header bg-info text-white py-3">
+                    <h6 class="m-0 font-weight-bold">
+                        <i class="fas fa-history me-2"></i>Activités Récentes
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush">
+                        {% for activity in copilot_stats.recent_activities %}
+                        <div class="list-group-item d-flex align-items-center px-0">
+                            <div class="flex-shrink-0">
+                                <i class="{{ activity.icon }} text-{{ activity.color }} fa-lg"></i>
+                            </div>
+                            <div class="flex-grow-1 ms-3">
+                                <small class="text-muted">{{ activity.timestamp|date:"d/m/Y H:i" }}</small>
+                                <p class="mb-0 small">{{ activity.description }}</p>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="text-center text-muted py-3">
+                            <p>Aucune activité récente</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+<!-- Actions Rapides CONCRÈTES -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-bolt me-2"></i>Actions Rapides - Résultats Concrets
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info mb-4">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Actions immédiates :</strong> Ces boutons génèrent des rapports et actions concrets en temps réel.
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <button class="btn btn-outline-primary w-100 h-100 py-3" onclick="quickAction('stock_report')">
+                            <i class="fas fa-file-alt fa-2x mb-2"></i><br>
+                            Rapport Stock<br>
+                            <small class="text-muted">Produits à réapprovisionner</small>
+                        </button>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <button class="btn btn-outline-success w-100 h-100 py-3" onclick="quickAction('production_plan')">
+                            <i class="fas fa-calendar-check fa-2x mb-2"></i><br>
+                            Plan Production<br>
+                            <small class="text-muted">Commandes prioritaires</small>
+                        </button>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <button class="btn btn-outline-info w-100 h-100 py-3" onclick="quickAction('customer_analysis')">
+                            <i class="fas fa-chart-pie fa-2x mb-2"></i><br>
+                            Analyse Clients<br>
+                            <small class="text-muted">Top clients & CA</small>
+                        </button>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <button class="btn btn-outline-warning w-100 h-100 py-3" onclick="quickAction('alert_summary')">
+                            <i class="fas fa-exclamation-triangle fa-2x mb-2"></i><br>
+                            Synthèse Alertes<br>
+                            <small class="text-muted">Points critiques</small>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Résultats des Actions -->
+                <div id="actionResults" class="mt-4">
+                    <div class="text-center text-muted">
+                        <i class="fas fa-rocket fa-2x mb-2"></i>
+                        <p>Cliquez sur une action pour voir les résultats concrets</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+    <!-- Suggestions Contextuelles -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header bg-secondary text-white py-3">
+                    <h6 class="m-0 font-weight-bold">
+                        <i class="fas fa-magic me-2"></i>Suggestions Intelligentes
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for suggestion in page_suggestions %}
+                        <div class="col-md-4 mb-3">
+                            <div class="card border-left-primary h-100">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <i class="fas fa-lightbulb text-warning me-2"></i>Suggestion
+                                    </h6>
+                                    <p class="card-text small">{{ suggestion }}</p>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="applySuggestion('{{ suggestion }}')">
+                                        Appliquer
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Modal -->
+<div class="modal fade" id="loadingModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-body text-center py-4">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Chargement...</span>
+                </div>
+                <p class="mb-0" id="loadingText">Analyse en cours...</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Fonction pour récupérer le token CSRF
+function getCSRFToken() {
+    const name = 'csrftoken';
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Fonction d'analyse
+function runAnalysis(analysisType) {
+    console.log('🚀 Lancement analyse:', analysisType);
+    showLoading('Analyse en cours...');
+
+    const formData = new FormData();
+    formData.append('analysis_type', analysisType);
+    formData.append('csrfmiddlewaretoken', getCSRFToken());
+
+    fetch('{% url "copilot_analyze" %}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        console.log('Réponse reçue, status:', response.status);
+        if (!response.ok) {
+            throw new Error('Erreur HTTP: ' + response.status);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Données reçues:', data);
+        hideLoading();
+        if (data.success) {
+            displayAnalysisResults(data);
+        } else {
+            showError('Erreur: ' + (data.error || 'Inconnue'));
+        }
+    })
+    .catch(error => {
+        console.error('Erreur fetch:', error);
+        hideLoading();
+        showError('Erreur réseau: ' + error.message);
+    });
+}
+
+// Affichage des résultats
+function displayAnalysisResults(data) {
+    const container = document.getElementById('analysisResults');
+    console.log('Affichage résultats:', data);
+    
+    let html = '';
+
+    switch(data.analysis_type) {
+        case 'overview':
+            html = `
+                <div class="alert alert-primary">
+                    <h5><i class="fas fa-globe me-2"></i>Vue d'Ensemble</h5>
+                </div>
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="card border-left-primary mb-3">
+                            <div class="card-body">
+                                <h6>Clients</h6>
+                                <h3>${data.data.summary?.total_customers || 0}</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card border-left-success mb-3">
+                            <div class="card-body">
+                                <h6>Produits</h6>
+                                <h3>${data.data.summary?.total_products || 0}</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card border-left-info mb-3">
+                            <div class="card-body">
+                                <h6>Commandes Actives</h6>
+                                <h3>${data.data.summary?.active_orders || 0}</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="alert alert-info">
+                    <strong>Dernière mise à jour:</strong> ${data.timestamp || 'Maintenant'}
+                </div>
+            `;
+            break;
+        case 'stock':
+            html = `
+                <div class="alert alert-warning">
+                    <h5><i class="fas fa-boxes me-2"></i>Analyse Stock</h5>
+                </div>
+                <div class="alert alert-${data.data.low_stock_count > 0 ? 'warning' : 'success'}">
+                    <strong>${data.data.low_stock_count || 0} produits en stock faible</strong>
+                </div>
+                ${data.data.insights && data.data.insights.length > 0 ? 
+                    data.data.insights.map(insight => `
+                        <div class="alert alert-info small">${insight}</div>
+                    `).join('') : ''}
+            `;
+            break;
+        case 'production':
+            html = `
+                <div class="alert alert-info">
+                    <h5><i class="fas fa-industry me-2"></i>Analyse Production</h5>
+                </div>
+                <div class="alert alert-${data.data.delayed_orders_count > 0 ? 'warning' : 'success'}">
+                    <strong>${data.data.delayed_orders_count || 0} commandes en retard</strong>
+                </div>
+                <div class="alert alert-primary">
+                    <strong>${data.data.total_active_orders || 0} commandes en production</strong>
+                </div>
+            `;
+            break;
+        case 'financial':
+            html = `
+                <div class="alert alert-success">
+                    <h5><i class="fas fa-euro-sign me-2"></i>Analyse Financière</h5>
+                </div>
+                <div class="alert alert-success">
+                    <strong>Chiffre d'affaires (30j): ${data.data.total_revenue_30d ? data.data.total_revenue_30d.toLocaleString('fr-FR') + '€' : 'N/A'}</strong>
+                </div>
+                <div class="alert alert-info">
+                    <strong>Commande moyenne: ${data.data.average_order_value ? data.data.average_order_value.toLocaleString('fr-FR') + '€' : 'N/A'}</strong>
+                </div>
+            `;
+            break;
+        default:
+            html = '<div class="alert alert-danger">Type d\'analyse non reconnu</div>';
+    }
+
+    container.innerHTML = html;
+}
+
+// ========== FONCTIONS UTILITAIRES ==========
+
+function showLoading(text) {
+    document.getElementById('loadingText').textContent = text;
+    const modal = new bootstrap.Modal(document.getElementById('loadingModal'));
+    modal.show();
+}
+
+function hideLoading() {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('loadingModal'));
+    if (modal) {
+        modal.hide();
+    }
+}
+
+function showSuccess(message) {
+    alert('✅ ' + message);
+}
+
+function showError(message) {
+    alert('❌ ' + message);
+}
+// Fonction pour les actions rapides avec résultats concrets
+function quickAction(action) {
+    console.log('Action rapide:', action);
+    showLoading('Génération du rapport...');
+    
+    const formData = new FormData();
+    formData.append('action', action);
+    formData.append('csrfmiddlewaretoken', getCSRFToken());
+    
+    fetch('{% url "copilot_execute_action" %}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.success) {
+            displayActionResults(data.result);
+        } else {
+            showError(data.error || 'Erreur lors de l\'exécution');
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        showError('Erreur réseau: ' + error.message);
+    });
+}
+
+// Affichage des résultats d'action CONCRETS
+function displayActionResults(result) {
+    const container = document.getElementById('actionResults');
+    
+    let html = `
+        <div class="alert alert-success">
+            <h5>${result.message}</h5>
+            <small class="text-muted">Généré le: ${new Date().toLocaleString('fr-FR')}</small>
+        </div>
+    `;
+    
+    if (result.type === 'report') {
+        html += createReportHTML(result.data);
+    } else if (result.type === 'plan') {
+        html += createPlanHTML(result.data);
+    } else if (result.type === 'analysis') {
+        html += createAnalysisHTML(result.data);
+    } else if (result.type === 'alerts') {
+        html += createAlertsHTML(result.data);
+    } else if (result.type === 'action') {
+        html += createActionHTML(result.data);
+    }
+    
+    container.innerHTML = html;
+}
+
+// Templates pour les différents types de résultats
+function createReportHTML(data) {
+    return `
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card border-left-warning mb-3">
+                    <div class="card-body">
+                        <h6 class="text-warning">Produits Stock Faible</h6>
+                        <h2>${data.low_stock_count}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card border-left-danger mb-3">
+                    <div class="card-body">
+                        <h6 class="text-danger">Produits en Rupture</h6>
+                        <h2>${data.critical_count}</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        ${data.low_stock_products && data.low_stock_products.length > 0 ? `
+            <div class="alert alert-warning">
+                <h6>📦 Produits à Réapprovisionner:</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Référence</th>
+                                <th>Nom</th>
+                                <th>Stock Actuel</th>
+                                <th>Stock Min</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.low_stock_products.map(product => `
+                                <tr>
+                                    <td><strong>${product.reference}</strong></td>
+                                    <td>${product.name}</td>
+                                    <td class="text-danger">${product.current_stock}</td>
+                                    <td>${product.min_stock}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        ` : ''}
+        
+        <div class="alert alert-info">
+            <h6>🚀 Actions Recommandées:</h6>
+            <ul class="mb-0">
+                <li>Planifier les réapprovisionnements urgents</li>
+                <li>Contacter les fournisseurs pour les ruptures</li>
+                <li>Réviser les niveaux de stock minimum</li>
+            </ul>
+        </div>
+    `;
+}
+
+function createPlanHTML(data) {
+    return `
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card border-left-danger mb-3">
+                    <div class="card-body">
+                        <h6 class="text-danger">Commandes en Retard</h6>
+                        <h2>${data.delayed_orders_count}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card border-left-warning mb-3">
+                    <div class="card-body">
+                        <h6 class="text-warning">Commandes Urgentes</h6>
+                        <h2>${data.urgent_orders_count}</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        ${data.delayed_orders && data.delayed_orders.length > 0 ? `
+            <div class="alert alert-danger">
+                <h6>⏰ Commandes en Retard:</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Commande</th>
+                                <th>Client</th>
+                                <th>Date Livraison</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.delayed_orders.map(order => `
+                                <tr>
+                                    <td><strong>${order.order_number}</strong></td>
+                                    <td>${order.customer__name}</td>
+                                    <td class="text-danger">${order.delivery_date}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        ` : ''}
+        
+        <div class="alert alert-success">
+            <h6>📅 Plan d'Action Production:</h6>
+            <ul class="mb-0">
+                ${data.priority_actions.map(action => `<li>${action}</li>`).join('')}
+            </ul>
+        </div>
+    `;
+}
+
+// Fonction pour les insights
+function handleInsightAction(action) {
+    console.log('Action insight concrète:', action);
+    quickAction(action);
+}
+// ========== INITIALISATION ==========
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 ERP Copilot initialisé - Prêt à analyser sur demande');
+    
+    // Ajouter les écouteurs d'événements
+    document.getElementById('btnOverview').addEventListener('click', function() {
+        console.log('Clic sur Vue Globale');
+        runAnalysis('overview');
+    });
+    
+    document.getElementById('btnStock').addEventListener('click', function() {
+        console.log('Clic sur Analyse Stock');
+        runAnalysis('stock');
+    });
+    
+    document.getElementById('btnProduction').addEventListener('click', function() {
+        console.log('Clic sur Analyse Production');
+        runAnalysis('production');
+    });
+    
+    document.getElementById('btnFinancial').addEventListener('click', function() {
+        console.log('Clic sur Analyse Finances');
+        runAnalysis('financial');
+    });
+    
+    // Écouteurs pour les boutons d'action
+    document.querySelectorAll('.action-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const action = this.getAttribute('data-action');
+            console.log('Action insight:', action);
+            showSuccess('Action déclenchée: ' + action);
+        });
+    });
+    
+    console.log('✅ Tous les écouteurs d\'événements sont configurés');
+    console.log('📍 Les analyses se déclenchent maintenant uniquement sur clic');
+});
+</script>
+{% endblock %}

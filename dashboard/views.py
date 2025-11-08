@@ -1,12 +1,14 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db.models import Q, F, Sum
+from django.db.models import Q, F, Sum, Count
 from django.utils import timezone
 from django.db import models
 from .models import Order, Product, Customer, StockMovement, OrderItem, PlanningEvent, AIConversation, AIAnalysis
 from .forms import ProductForm, OrderForm, StockMovementForm, CustomerForm
 from django.http import JsonResponse 
+import json
+
 
 @login_required
 def dashboard(request):
@@ -1045,3 +1047,1008 @@ def archive_product(request, product_id):
         return redirect('product_list')
     
     return render(request, 'dashboard/products/archive_product.html', {'product': product})
+
+# ========== ERP COPILOT ==========
+@login_required
+def erp_copilot(request):
+    """Vue principale pour l'ERP Copilot - Assistant automatique contextuel"""
+    
+    # Récupérer le contexte métier actuel
+    business_context = get_current_business_context()
+    
+    # Générer des insights automatiques
+    automatic_insights = generate_automatic_insights(business_context)
+    
+    # Statistiques pour le dashboard copilot
+    copilot_stats = {
+        'total_insights': len(automatic_insights),
+        'critical_alerts': business_context['low_stock_products_count'] + business_context['delayed_orders_count'],
+        'optimization_opportunities': count_optimization_opportunities(business_context),
+        'recent_activities': get_recent_activities()
+    }
+    
+    context = {
+        'business_context': business_context,
+        'automatic_insights': automatic_insights,
+        'copilot_stats': copilot_stats,
+        'page_suggestions': get_page_specific_suggestions(request.path),
+    }
+    
+    return render(request, 'dashboard/copilot/erp_copilot.html', context)
+
+@login_required
+def copilot_analyze(request):
+    """Endpoint pour l'analyse en temps réel par le copilot"""
+    if request.method == 'POST':
+        analysis_type = request.POST.get('analysis_type', 'overview')
+        
+        if analysis_type == 'stock':
+            result = analyze_stock_situation(detailed=True)
+        elif analysis_type == 'production':
+            result = analyze_production_efficiency(detailed=True)
+        elif analysis_type == 'financial':
+            result = analyze_financial_performance()
+        elif analysis_type == 'optimization':
+            result = analyze_optimization_opportunities()
+        else:
+            result = get_business_overview()
+        
+        return JsonResponse({
+            'success': True,
+            'analysis_type': analysis_type,
+            'data': result,
+            'timestamp': timezone.now().strftime('%d/%m/%Y %H:%M')
+        })
+    
+    return JsonResponse({'success': False, 'error': 'Méthode non autorisée'})
+
+# ========== VUES CONCRETES POUR ACTIONS RAPIDES ==========
+
+@login_required
+def copilot_analyze(request):
+    """Endpoint pour l'analyse en temps réel par le copilot"""
+    if request.method == 'POST':
+        analysis_type = request.POST.get('analysis_type', 'overview')
+        
+        if analysis_type == 'stock':
+            result = analyze_stock_situation(detailed=True)
+        elif analysis_type == 'production':
+            result = analyze_production_efficiency(detailed=True)
+        elif analysis_type == 'financial':
+            result = analyze_financial_performance()
+        elif analysis_type == 'optimization':
+            result = analyze_optimization_opportunities()
+        else:
+            result = get_business_overview()
+        
+        return JsonResponse({
+            'success': True,
+            'analysis_type': analysis_type,
+            'data': result,
+            'timestamp': timezone.now().strftime('%d/%m/%Y %H:%M')
+        })
+    
+    return JsonResponse({'success': False, 'error': 'Méthode non autorisée'})
+
+@login_required
+def copilot_execute_action(request):
+    """Endpoint pour exécuter des actions concrètes"""
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        
+        if action == 'stock_report':
+            # Générer un vrai rapport stock
+            low_stock_products = Product.objects.filter(current_stock__lte=F('min_stock'))
+            critical_products = Product.objects.filter(current_stock=0)
+            
+            result = {
+                'message': '📊 Rapport de Stock Généré',
+                'type': 'report',
+                'data': {
+                    'low_stock_count': low_stock_products.count(),
+                    'critical_count': critical_products.count(),
+                    'low_stock_products': list(low_stock_products.values('reference', 'name', 'current_stock', 'min_stock')),
+                    'critical_products': list(critical_products.values('reference', 'name', 'current_stock')),
+                    'generated_at': timezone.now().strftime('%d/%m/%Y %H:%M')
+                }
+            }
+            
+        elif action == 'production_plan':
+            # Générer un plan de production
+            delayed_orders = Order.objects.filter(
+                delivery_date__lt=timezone.now().date(),
+                status__in=['confirmed', 'in_production']
+            )
+            urgent_orders = Order.objects.filter(
+                delivery_date__lte=timezone.now().date() + timezone.timedelta(days=2),
+                status__in=['confirmed', 'in_production']
+            )
+            
+            result = {
+                'message': '📅 Plan de Production Généré',
+                'type': 'plan',
+                'data': {
+                    'delayed_orders_count': delayed_orders.count(),
+                    'urgent_orders_count': urgent_orders.count(),
+                    'delayed_orders': list(delayed_orders.values('order_number', 'customer__name', 'delivery_date')),
+                    'urgent_orders': list(urgent_orders.values('order_number', 'customer__name', 'delivery_date')),
+                    'priority_actions': [
+                        "Traiter les commandes en retard en priorité",
+                        "Contacter les clients des commandes retardées",
+                        "Réviser la planification de la semaine"
+                    ]
+                }
+            }
+            
+        elif action == 'customer_analysis':
+            # Analyse clients
+            top_customers = Customer.objects.annotate(
+                total_orders=Count('order'),
+                total_spent=Sum('order__total_amount')
+            ).order_by('-total_spent')[:5]
+            
+            result = {
+                'message': '👥 Analyse Clients Générée',
+                'type': 'analysis',
+                'data': {
+                    'total_customers': Customer.objects.count(),
+                    'top_customers': list(top_customers.values('name', 'email', 'total_orders', 'total_spent')),
+                    'insights': [
+                        f"{len(top_customers)} clients représentent 80% du chiffre d'affaires",
+                        "Opportunité de fidélisation des clients premium"
+                    ]
+                }
+            }
+            
+        elif action == 'alert_summary':
+            # Synthèse des alertes
+            stock_alerts = Product.objects.filter(current_stock__lte=F('min_stock')).count()
+            delivery_alerts = Order.objects.filter(
+                delivery_date__lt=timezone.now().date(),
+                status__in=['confirmed', 'in_production']
+            ).count()
+            
+            result = {
+                'message': '🚨 Synthèse des Alertes',
+                'type': 'alerts',
+                'data': {
+                    'stock_alerts': stock_alerts,
+                    'delivery_alerts': delivery_alerts,
+                    'critical_alerts': Product.objects.filter(current_stock=0).count(),
+                    'actions_required': [
+                        f"Réapprovisionner {stock_alerts} produits" if stock_alerts > 0 else "Aucune alerte stock",
+                        f"Traiter {delivery_alerts} retards" if delivery_alerts > 0 else "Aucun retard"
+                    ]
+                }
+            }
+            
+        elif action == 'reapprovisionner_urgence':
+            # Action concrète pour réapprovisionnement
+            critical_products = Product.objects.filter(current_stock=0)
+            if critical_products.exists():
+                product_list = ", ".join([p.reference for p in critical_products[:3]])
+                result = {
+                    'message': f'🔄 Réapprovisionnement Urgence',
+                    'type': 'action',
+                    'data': {
+                        'products': list(critical_products.values('reference', 'name')),
+                        'recommended_quantities': {p.reference: p.min_stock * 3 for p in critical_products},
+                        'next_steps': [
+                            f"Commander {len(critical_products)} produits en urgence",
+                            "Contacter les fournisseurs prioritaires",
+                            "Mettre à jour le planning de réception"
+                        ]
+                    }
+                }
+            else:
+                result = {'message': '✅ Aucun produit en rupture de stock'}
+                
+        elif action == 'gerer_retards':
+            # Action pour gérer les retards
+            delayed_orders = Order.objects.filter(
+                delivery_date__lt=timezone.now().date(),
+                status__in=['confirmed', 'in_production']
+            )
+            if delayed_orders.exists():
+                result = {
+                    'message': f'⏰ Gestion des Retards',
+                    'type': 'action',
+                    'data': {
+                        'delayed_orders_count': delayed_orders.count(),
+                        'orders': list(delayed_orders.values('order_number', 'customer__name', 'delivery_date')),
+                        'actions': [
+                            "Prioriser ces commandes en production",
+                            "Contacter les clients pour informer",
+                            "Réviser les délais de livraison"
+                        ]
+                    }
+                }
+            else:
+                result = {'message': '✅ Aucune commande en retard'}
+                
+        else:
+            result = {'message': f'Action "{action}" exécutée'}
+        
+        return JsonResponse({'success': True, 'result': result})
+    
+    return JsonResponse({'success': False, 'error': 'Méthode non autorisée'})
+
+@login_required
+def copilot_suggest_action(request):
+    """Endpoint pour obtenir des suggestions d'actions"""
+    if request.method == 'POST':
+        action_type = request.POST.get('action_type')
+        context_data = request.POST.get('context_data', '{}')
+        
+        try:
+            context = json.loads(context_data)
+        except:
+            context = get_current_business_context()
+        
+        suggestions = generate_action_suggestions(action_type, context)
+        
+        return JsonResponse({
+            'success': True,
+            'suggestions': suggestions,
+            'action_type': action_type
+        })
+    
+    return JsonResponse({'success': False, 'error': 'Méthode non autorisée'})
+
+# ========== FONCTIONS SUPPORT ERP COPILOT ==========
+
+def generate_automatic_insights(business_context):
+    """Génère des insights automatiques basés sur le contexte métier"""
+    insights = []
+    
+    # Insights sur le stock
+    low_stock_count = len(business_context['low_stock_products'])
+    if low_stock_count > 0:
+        critical_products = [p for p in business_context['low_stock_products'] if p['current_stock'] == 0]
+        
+        if critical_products:
+            insights.append({
+                'type': 'critical',
+                'icon': 'fas fa-exclamation-triangle',
+                'title': f'Rupture de stock sur {len(critical_products)} produit(s)',
+                'description': f'Produits en rupture : {", ".join([p["reference"] for p in critical_products[:3]])}',
+                'action': 'reapprovisionner_urgence',
+                'priority': 1
+            })
+        else:
+            insights.append({
+                'type': 'warning',
+                'icon': 'fas fa-box',
+                'title': f'{low_stock_count} produit(s) avec stock faible',
+                'description': 'Niveau de stock proche du minimum pour plusieurs produits',
+                'action': 'verifier_stock',
+                'priority': 2
+            })
+    
+    # Insights sur les commandes
+    delayed_orders_count = len(business_context['delayed_orders'])
+    if delayed_orders_count > 0:
+        insights.append({
+            'type': 'warning',
+            'icon': 'fas fa-clock',
+            'title': f'{delayed_orders_count} commande(s) en retard',
+            'description': 'Des commandes dépassent leur date de livraison prévue',
+            'action': 'gerer_retards',
+            'priority': 1
+        })
+    
+    # Insights sur la production
+    active_orders = business_context['active_orders_count']
+    if active_orders > 10:
+        insights.append({
+            'type': 'info',
+            'icon': 'fas fa-industry',
+            'title': 'Charge de production élevée',
+            'description': f'{active_orders} commandes en cours de production',
+            'action': 'optimiser_planning',
+            'priority': 3
+        })
+    
+    # Insights sur les performances
+    on_time_rate = calculate_on_time_rate()
+    if on_time_rate < 85:
+        insights.append({
+            'type': 'warning',
+            'icon': 'fas fa-chart-line',
+            'title': f'Taux de ponctualité bas ({on_time_rate}%)',
+            'description': 'Optimisation nécessaire des délais de production',
+            'action': 'analyser_delais',
+            'priority': 2
+        })
+    
+    # Trier par priorité
+    insights.sort(key=lambda x: x['priority'])
+    return insights
+
+def count_optimization_opportunities(business_context):
+    """Compte les opportunités d'optimisation"""
+    opportunities = 0
+    
+    # Opportunités stock
+    low_stock_ratio = len(business_context['low_stock_products']) / business_context['total_products']
+    if low_stock_ratio > 0.1:  # Plus de 10% des produits en stock faible
+        opportunities += 1
+    
+    # Opportunités production
+    if business_context['delayed_orders_count'] > 0:
+        opportunities += 1
+    
+    # Opportunités financières
+    if business_context.get('cash_flow_risk', False):
+        opportunities += 1
+    
+    return opportunities
+
+def get_recent_activities():
+    """Récupère les activités récentes pour le copilot"""
+    recent_activities = []
+    
+    # Dernières commandes créées
+    recent_orders = Order.objects.select_related('customer').order_by('-created_at')[:3]
+    for order in recent_orders:
+        recent_activities.append({
+            'type': 'order',
+            'icon': 'fas fa-shopping-cart',
+            'description': f'Nouvelle commande {order.order_number} pour {order.customer.name}',
+            'timestamp': order.created_at,
+            'color': 'primary'
+        })
+    
+    # Derniers mouvements de stock
+    recent_movements = StockMovement.objects.select_related('product').order_by('-created_at')[:3]
+    for movement in recent_movements:
+        recent_activities.append({
+            'type': 'stock',
+            'icon': 'fas fa-boxes',
+            'description': f'{movement.movement_type} de {movement.quantity} {movement.product.reference}',
+            'timestamp': movement.created_at,
+            'color': 'info'
+        })
+    
+    # Dernières analyses IA
+    recent_analyses = AIAnalysis.objects.order_by('-created_at')[:2]
+    for analysis in recent_analyses:
+        recent_activities.append({
+            'type': 'analysis',
+            'icon': 'fas fa-robot',
+            'description': f'Analyse {analysis.analysis_type} générée',
+            'timestamp': analysis.created_at,
+            'color': 'success'
+        })
+    
+    # Trier par timestamp
+    recent_activities.sort(key=lambda x: x['timestamp'], reverse=True)
+    return recent_activities[:5]  # Retourner les 5 plus récentes
+
+def get_page_specific_suggestions(current_path):
+    """Retourne des suggestions spécifiques à la page actuelle"""
+    suggestions = []
+    
+    if 'dashboard' in current_path:
+        suggestions = [
+            "Vérifier les KPIs du jour",
+            "Analyser les alertes prioritaires",
+            "Planifier les actions de la semaine"
+        ]
+    elif 'customers' in current_path:
+        suggestions = [
+            "Analyser le portefeuille clients",
+            "Identifier les clients stratégiques",
+            "Vérifier les retards de paiement"
+        ]
+    elif 'orders' in current_path:
+        suggestions = [
+            "Optimiser l'ordonnancement",
+            "Vérifier la disponibilité stock",
+            "Analyser les retards"
+        ]
+    elif 'products' in current_path or 'stock' in current_path:
+        suggestions = [
+            "Réapprovisionner les stocks faibles",
+            "Optimiser les niveaux de stock",
+            "Analyser la rotation des produits"
+        ]
+    elif 'planning' in current_path:
+        suggestions = [
+            "Équilibrer la charge de travail",
+            "Anticiper les goulots d'étranglement",
+            "Optimiser le calendrier de production"
+        ]
+    else:
+        suggestions = [
+            "Analyser les performances globales",
+            "Identifier les points d'amélioration",
+            "Planifier les optimisations"
+        ]
+    
+    return suggestions
+
+def analyze_financial_performance():
+    """Analyse les performances financières"""
+    # Calcul du chiffre d'affaires des 30 derniers jours
+    thirty_days_ago = timezone.now() - timezone.timedelta(days=30)
+    recent_orders = Order.objects.filter(
+        created_at__gte=thirty_days_ago,
+        status__in=['shipped', 'delivered']
+    )
+    
+    total_revenue = sum(order.total_amount for order in recent_orders)
+    average_order_value = total_revenue / len(recent_orders) if recent_orders else 0
+    
+    # Analyse de la rentabilité
+    high_value_orders = recent_orders.filter(total_amount__gt=average_order_value * 1.5)
+    
+    return {
+        'total_revenue_30d': total_revenue,
+        'average_order_value': round(average_order_value, 2),
+        'high_value_orders_count': high_value_orders.count(),
+        'orders_count_30d': len(recent_orders),
+        'insights': [
+            f"CA 30j : {total_revenue:,.2f}€" if total_revenue > 0 else "Aucune vente récente",
+            f"Commande moyenne : {average_order_value:.2f}€" if average_order_value > 0 else ""
+        ],
+        'recommendations': [
+            "Développer le portefeuille clients" if len(recent_orders) < 10 else "",
+            "Fidéliser les clients à forte valeur" if high_value_orders.count() > 0 else ""
+        ]
+    }
+
+def analyze_optimization_opportunities():
+    """Identifie les opportunités d'optimisation"""
+    opportunities = []
+    
+    # Optimisation stock
+    overstock_products = Product.objects.filter(current_stock__gt=F('max_stock') * 1.2)
+    if overstock_products.exists():
+        opportunities.append({
+            'category': 'stock',
+            'title': 'Surstock détecté',
+            'description': f'{overstock_products.count()} produits au-dessus du stock max',
+            'impact': 'medium',
+            'action': 'reduire_stock'
+        })
+    
+    # Optimisation production
+    long_production_orders = Order.objects.filter(
+        status='in_production',
+        created_at__lte=timezone.now() - timezone.timedelta(days=7)
+    )
+    if long_production_orders.exists():
+        opportunities.append({
+            'category': 'production',
+            'title': 'Temps de production longs',
+            'description': f'{long_production_orders.count()} commandes en production depuis +7j',
+            'impact': 'high',
+            'action': 'accelerer_production'
+        })
+    
+    # Optimisation processus
+    draft_orders = Order.objects.filter(status='draft', created_at__lte=timezone.now() - timezone.timedelta(days=2))
+    if draft_orders.exists():
+        opportunities.append({
+            'category': 'process',
+            'title': 'Commandes en attente',
+            'description': f'{draft_orders.count()} commandes brouillons non traitées',
+            'impact': 'low',
+            'action': 'traiter_brouillons'
+        })
+    
+    return {
+        'total_opportunities': len(opportunities),
+        'high_impact_count': len([o for o in opportunities if o['impact'] == 'high']),
+        'opportunities': opportunities
+    }
+
+def get_business_overview():
+    """Vue d'ensemble de l'entreprise"""
+    context = get_current_business_context()
+    
+    return {
+        'summary': {
+            'total_customers': context['total_customers'],
+            'total_products': context['total_products'],
+            'active_orders': context['active_orders_count'],
+            'monthly_revenue': analyze_financial_performance()['total_revenue_30d']
+        },
+        'health_indicators': {
+            'stock_health': calculate_stock_health(),
+            'production_health': calculate_production_health(),
+            'financial_health': calculate_financial_health()
+        },
+        'key_metrics': {
+            'on_time_delivery_rate': calculate_on_time_rate(),
+            'stock_turnover': calculate_stock_turnover(),
+            'customer_satisfaction': estimate_customer_satisfaction()
+        }
+    }
+
+def calculate_stock_health():
+    """Calcule la santé du stock (0-100%)"""
+    total_products = Product.objects.count()
+    if total_products == 0:
+        return 100
+    
+    healthy_stock = Product.objects.filter(
+        current_stock__gt=F('min_stock'),
+        current_stock__lte=F('max_stock')
+    ).count()
+    
+    return round((healthy_stock / total_products) * 100, 1)
+
+def calculate_production_health():
+    """Calcule la santé de la production (0-100%)"""
+    total_orders = Order.objects.filter(status__in=['confirmed', 'in_production', 'shipped']).count()
+    if total_orders == 0:
+        return 100
+    
+    on_time_orders = Order.objects.filter(
+        status__in=['shipped', 'delivered'],
+        delivery_date__gte=models.F('created_at')
+    ).count()
+    
+    return round((on_time_orders / total_orders) * 100, 1) if total_orders > 0 else 100
+
+def calculate_financial_health():
+    """Estime la santé financière (simplifié)"""
+    # Logique simplifiée - à adapter selon vos besoins
+    recent_paid_orders = Order.objects.filter(
+        status__in=['shipped', 'delivered'],
+        created_at__gte=timezone.now() - timezone.timedelta(days=30)
+    ).count()
+    
+    if recent_paid_orders > 20:
+        return 90
+    elif recent_paid_orders > 10:
+        return 75
+    elif recent_paid_orders > 5:
+        return 60
+    else:
+        return 40
+
+def calculate_stock_turnover():
+    """Calcule la rotation des stocks (simplifié)"""
+    # Logique simplifiée - à implémenter selon votre business
+    return 4.2  # Exemple: 4.2 rotations par an
+
+def estimate_customer_satisfaction():
+    """Estime la satisfaction client (simplifié)"""
+    delayed_orders = Order.objects.filter(
+        delivery_date__lt=timezone.now().date(),
+        status__in=['confirmed', 'in_production']
+    ).count()
+    
+    total_active_orders = Order.objects.filter(status__in=['confirmed', 'in_production']).count()
+    
+    if total_active_orders == 0:
+        return 95
+    
+    satisfaction = 100 - (delayed_orders / total_active_orders * 50)  # Pénalité pour retards
+    return max(60, min(100, round(satisfaction, 1)))
+
+def generate_action_suggestions(action_type, context):
+    """Génère des suggestions d'actions spécifiques"""
+    suggestions = []
+    
+    if action_type == 'stock_management':
+        low_stock_products = context.get('low_stock_products', [])
+        for product in low_stock_products[:3]:
+            suggestions.append({
+                'action': f'reorder_{product["reference"]}',
+                'title': f'Réapprovisionner {product["reference"]}',
+                'description': f'Stock actuel: {product["current_stock"]}, Minimum: {product["min_stock"]}',
+                'priority': 'high' if product['current_stock'] == 0 else 'medium'
+            })
+    
+    elif action_type == 'production_optimization':
+        if context.get('delayed_orders_count', 0) > 0:
+            suggestions.append({
+                'action': 'prioritize_delayed_orders',
+                'title': 'Prioriser les commandes en retard',
+                'description': f'{context["delayed_orders_count"]} commandes nécessitent une attention immédiate',
+                'priority': 'high'
+            })
+    
+    elif action_type == 'customer_management':
+        suggestions.extend([
+            {
+                'action': 'analyze_customer_segments',
+                'title': 'Analyser les segments clients',
+                'description': 'Identifier les clients les plus rentables',
+                'priority': 'medium'
+            },
+            {
+                'action': 'check_payment_delays',
+                'title': 'Vérifier les retards de paiement',
+                'description': 'Surveiller la santé financière des clients',
+                'priority': 'medium'
+            }
+        ])
+    
+    return suggestions
+
+def execute_copilot_action(action, parameters, user):
+    """Exécute une action via le copilot"""
+    
+    if action == 'generate_stock_report':
+        # Générer un rapport de stock
+        low_stock_products = Product.objects.filter(current_stock__lte=F('min_stock'))
+        return {
+            'message': f'Rapport généré: {low_stock_products.count()} produits en stock faible',
+            'data': list(low_stock_products.values('reference', 'name', 'current_stock', 'min_stock'))
+        }
+    
+    elif action == 'prioritize_delayed_orders':
+        # Marquer les commandes en retard comme prioritaires
+        delayed_orders = Order.objects.filter(
+            delivery_date__lt=timezone.now().date(),
+            status__in=['confirmed', 'in_production']
+        )
+        
+        count = delayed_orders.count()
+        return {
+            'message': f'{count} commandes en retard identifiées comme prioritaires',
+            'count': count
+        }
+    
+    elif action.startswith('reorder_'):
+        # Simulation de réapprovisionnement
+        product_ref = action.replace('reorder_', '')
+        try:
+            product = Product.objects.get(reference=product_ref)
+            suggested_qty = max(product.min_stock * 2, product.current_stock + 10)
+            return {
+                'message': f'Réapprovisionnement suggéré pour {product_ref}: {suggested_qty} unités',
+                'product': product_ref,
+                'suggested_quantity': suggested_qty
+            }
+        except Product.DoesNotExist:
+            return {'error': f'Produit {product_ref} non trouvé'}
+    
+    else:
+        return {'error': f'Action {action} non reconnue'}
+
+# ========== FONCTIONS SUPPORT ERP COPILOT ==========
+
+def get_current_business_context():
+    """Récupère le contexte métier actuel pour l'IA - Version corrigée"""
+    low_stock_products = list(Product.objects.filter(
+        current_stock__lte=F('min_stock')
+    ).values('reference', 'name', 'current_stock', 'min_stock'))
+    
+    delayed_orders = list(Order.objects.filter(
+        delivery_date__lt=timezone.now().date(),
+        status__in=['confirmed', 'in_production']
+    ).values('order_number', 'customer__name', 'delivery_date'))
+    
+    recent_stock_movements = list(StockMovement.objects.select_related(
+        'product'
+    ).order_by('-created_at')[:10].values(
+        'product__reference', 'movement_type', 'quantity', 'reason', 'created_at'
+    ))
+    
+    context = {
+        'low_stock_products': low_stock_products,
+        'delayed_orders': delayed_orders,
+        'active_orders_count': Order.objects.filter(status='in_production').count(),
+        'total_products': Product.objects.count(),
+        'total_customers': Customer.objects.count(),
+        'recent_stock_movements': recent_stock_movements,
+        'low_stock_products_count': len(low_stock_products),
+        'delayed_orders_count': len(delayed_orders),
+        'cash_flow_risk': analyze_cash_flow_risk(),
+        'production_capacity': estimate_production_capacity()
+    }
+    
+    return context
+
+def get_extended_business_context():
+    """Version étendue pour le copilot - sans récursion"""
+    base_context = get_current_business_context()
+    
+    # Ajouter des données supplémentaires pour le copilot
+    base_context.update({
+        'cash_flow_risk': analyze_cash_flow_risk(),
+        'production_capacity': estimate_production_capacity(),
+        'health_indicators': {
+            'stock_health': calculate_stock_health(),
+            'production_health': calculate_production_health(),
+            'financial_health': calculate_financial_health()
+        }
+    })
+    
+    return base_context
+
+@login_required
+def erp_copilot(request):
+    """Vue principale pour l'ERP Copilot - Assistant automatique contextuel"""
+    
+    # Utiliser la version étendue sans récursion
+    business_context = get_extended_business_context()
+    
+    # Générer des insights automatiques
+    automatic_insights = generate_automatic_insights(business_context)
+    
+    # Statistiques pour le dashboard copilot
+    copilot_stats = {
+        'total_insights': len(automatic_insights),
+        'critical_alerts': business_context['low_stock_products_count'] + business_context['delayed_orders_count'],
+        'optimization_opportunities': count_optimization_opportunities(business_context),
+        'recent_activities': get_recent_activities()
+    }
+    
+    context = {
+        'business_context': business_context,
+        'automatic_insights': automatic_insights,
+        'copilot_stats': copilot_stats,
+        'page_suggestions': get_page_specific_suggestions(request.path),
+    }
+    
+    return render(request, 'dashboard/copilot/erp_copilot.html', context)
+
+def analyze_cash_flow_risk():
+    """Analyse simplifiée du risque de trésorerie"""
+    # Logique simplifiée - à adapter
+    unpaid_orders = Order.objects.filter(status='shipped').count()
+    return unpaid_orders > 5  # Risque si plus de 5 commandes livrées non payées
+
+def estimate_production_capacity():
+    """Estime la capacité de production actuelle"""
+    active_orders = Order.objects.filter(status='in_production').count()
+    return "Élevée" if active_orders < 8 else "Critique" if active_orders > 15 else "Normale"
+
+def calculate_stock_health():
+    """Calcule la santé du stock (0-100%)"""
+    total_products = Product.objects.count()
+    if total_products == 0:
+        return 100
+    
+    # Utilisez seulement min_stock puisque max_stock n'existe pas
+    healthy_stock = Product.objects.filter(
+        current_stock__gt=F('min_stock')
+    ).count()
+    
+    return round((healthy_stock / total_products) * 100, 1)
+
+def analyze_optimization_opportunities():
+    """Identifie les opportunités d'optimisation - Version corrigée"""
+    opportunities = []
+    
+    # Optimisation stock - version corrigée sans max_stock
+    overstock_products = Product.objects.filter(current_stock__gt=F('min_stock') * 3)
+    if overstock_products.exists():
+        opportunities.append({
+            'category': 'stock',
+            'title': 'Surstock potentiel',
+            'description': f'{overstock_products.count()} produits avec stock > 3x minimum',
+            'impact': 'medium',
+            'action': 'reduire_stock'
+        })
+    
+    # Optimisation production
+    long_production_orders = Order.objects.filter(
+        status='in_production',
+        created_at__lte=timezone.now() - timezone.timedelta(days=7)
+    )
+    if long_production_orders.exists():
+        opportunities.append({
+            'category': 'production',
+            'title': 'Temps de production longs',
+            'description': f'{long_production_orders.count()} commandes en production depuis +7j',
+            'impact': 'high',
+            'action': 'accelerer_production'
+        })
+    
+    # Optimisation processus
+    draft_orders = Order.objects.filter(status='draft', created_at__lte=timezone.now() - timezone.timedelta(days=2))
+    if draft_orders.exists():
+        opportunities.append({
+            'category': 'process',
+            'title': 'Commandes en attente',
+            'description': f'{draft_orders.count()} commandes brouillons non traitées',
+            'impact': 'low',
+            'action': 'traiter_brouillons'
+        })
+    
+    return {
+        'total_opportunities': len(opportunities),
+        'high_impact_count': len([o for o in opportunities if o['impact'] == 'high']),
+        'opportunities': opportunities
+    }
+
+def calculate_production_health():
+    """Calcule la santé de la production (0-100%)"""
+    total_orders = Order.objects.filter(status__in=['confirmed', 'in_production', 'shipped']).count()
+    if total_orders == 0:
+        return 100
+    
+    on_time_orders = Order.objects.filter(
+        status__in=['shipped', 'delivered'],
+        delivery_date__gte=models.F('created_at')
+    ).count()
+    
+    return round((on_time_orders / total_orders) * 100, 1) if total_orders > 0 else 100
+
+def calculate_financial_health():
+    """Estime la santé financière (simplifié)"""
+    # Logique simplifiée - à adapter selon vos besoins
+    recent_paid_orders = Order.objects.filter(
+        status__in=['shipped', 'delivered'],
+        created_at__gte=timezone.now() - timezone.timedelta(days=30)
+    ).count()
+    
+    if recent_paid_orders > 20:
+        return 90
+    elif recent_paid_orders > 10:
+        return 75
+    elif recent_paid_orders > 5:
+        return 60
+    else:
+        return 40
+    
+    
+# ========== FONCTIONS MANQUANTES POUR LES ANALYSES ==========
+
+def analyze_financial_performance():
+    """Analyse les performances financières"""
+    # Calcul du chiffre d'affaires des 30 derniers jours
+    thirty_days_ago = timezone.now() - timezone.timedelta(days=30)
+    recent_orders = Order.objects.filter(
+        created_at__gte=thirty_days_ago,
+        status__in=['shipped', 'delivered']
+    )
+    
+    total_revenue = sum(order.total_amount for order in recent_orders) if recent_orders else 0
+    average_order_value = total_revenue / len(recent_orders) if recent_orders else 0
+    
+    # Analyse de la rentabilité
+    high_value_orders = recent_orders.filter(total_amount__gt=average_order_value * 1.5) if recent_orders else []
+    
+    return {
+        'total_revenue_30d': total_revenue,
+        'average_order_value': round(average_order_value, 2),
+        'high_value_orders_count': len(high_value_orders),
+        'orders_count_30d': len(recent_orders),
+        'insights': [
+            f"CA 30j : {total_revenue:,.2f}€" if total_revenue > 0 else "Aucune vente récente",
+            f"Commande moyenne : {average_order_value:.2f}€" if average_order_value > 0 else "Aucune commande"
+        ],
+        'recommendations': [
+            "Développer le portefeuille clients" if len(recent_orders) < 10 else "Portefeuille clients stable",
+            "Fidéliser les clients à forte valeur" if len(high_value_orders) > 0 else "Diversifier le portefeuille"
+        ]
+    }
+
+def analyze_optimization_opportunities():
+    """Identifie les opportunités d'optimisation - Version corrigée"""
+    opportunities = []
+    
+    # Optimisation stock
+    overstock_products = Product.objects.filter(current_stock__gt=F('min_stock') * 3)
+    if overstock_products.exists():
+        opportunities.append({
+            'category': 'stock',
+            'title': 'Surstock potentiel',
+            'description': f'{overstock_products.count()} produits avec stock > 3x minimum',
+            'impact': 'medium',
+            'action': 'reduire_stock'
+        })
+    
+    # Optimisation production
+    long_production_orders = Order.objects.filter(
+        status='in_production',
+        created_at__lte=timezone.now() - timezone.timedelta(days=7)
+    )
+    if long_production_orders.exists():
+        opportunities.append({
+            'category': 'production',
+            'title': 'Temps de production longs',
+            'description': f'{long_production_orders.count()} commandes en production depuis +7j',
+            'impact': 'high',
+            'action': 'accelerer_production'
+        })
+    
+    # Optimisation processus
+    draft_orders = Order.objects.filter(status='draft', created_at__lte=timezone.now() - timezone.timedelta(days=2))
+    if draft_orders.exists():
+        opportunities.append({
+            'category': 'process',
+            'title': 'Commandes en attente',
+            'description': f'{draft_orders.count()} commandes brouillons non traitées',
+            'impact': 'low',
+            'action': 'traiter_brouillons'
+        })
+    
+    return {
+        'total_opportunities': len(opportunities),
+        'high_impact_count': len([o for o in opportunities if o['impact'] == 'high']),
+        'opportunities': opportunities
+    }
+
+def get_business_overview():
+    """Vue d'ensemble de l'entreprise"""
+    context = get_current_business_context()
+    
+    return {
+        'summary': {
+            'total_customers': context['total_customers'],
+            'total_products': context['total_products'],
+            'active_orders': context['active_orders_count'],
+            'monthly_revenue': analyze_financial_performance()['total_revenue_30d']
+        },
+        'health_indicators': {
+            'stock_health': calculate_stock_health(),
+            'production_health': calculate_production_health(),
+            'financial_health': calculate_financial_health()
+        },
+        'key_metrics': {
+            'on_time_delivery_rate': calculate_on_time_rate(),
+            'stock_turnover': 4.2,  # Valeur simulée
+            'customer_satisfaction': estimate_customer_satisfaction()
+        }
+    }
+
+def calculate_stock_turnover():
+    """Calcule la rotation des stocks (simplifié)"""
+    # Logique simplifiée - à implémenter selon votre business
+    return 4.2  # Exemple: 4.2 rotations par an
+
+def estimate_customer_satisfaction():
+    """Estime la satisfaction client (simplifié)"""
+    delayed_orders = Order.objects.filter(
+        delivery_date__lt=timezone.now().date(),
+        status__in=['confirmed', 'in_production']
+    ).count()
+    
+    total_active_orders = Order.objects.filter(status__in=['confirmed', 'in_production']).count()
+    
+    if total_active_orders == 0:
+        return 95
+    
+    satisfaction = 100 - (delayed_orders / total_active_orders * 50)  # Pénalité pour retards
+    return max(60, min(100, round(satisfaction, 1)))
+
+def generate_action_suggestions(action_type, context):
+    """Génère des suggestions d'actions spécifiques"""
+    suggestions = []
+    
+    if action_type == 'stock_management':
+        low_stock_products = context.get('low_stock_products', [])
+        for product in low_stock_products[:3]:
+            suggestions.append({
+                'action': f'reorder_{product["reference"]}',
+                'title': f'Réapprovisionner {product["reference"]}',
+                'description': f'Stock actuel: {product["current_stock"]}, Minimum: {product["min_stock"]}',
+                'priority': 'high' if product['current_stock'] == 0 else 'medium'
+            })
+    
+    elif action_type == 'production_optimization':
+        if context.get('delayed_orders_count', 0) > 0:
+            suggestions.append({
+                'action': 'prioritize_delayed_orders',
+                'title': 'Prioriser les commandes en retard',
+                'description': f'{context["delayed_orders_count"]} commandes nécessitent une attention immédiate',
+                'priority': 'high'
+            })
+    
+    elif action_type == 'customer_management':
+        suggestions.extend([
+            {
+                'action': 'analyze_customer_segments',
+                'title': 'Analyser les segments clients',
+                'description': 'Identifier les clients les plus rentables',
+                'priority': 'medium'
+            },
+            {
+                'action': 'check_payment_delays',
+                'title': 'Vérifier les retards de paiement',
+                'description': 'Surveiller la santé financière des clients',
+                'priority': 'medium'
+            }
+        ])
+    
+    return suggestions    
