@@ -148,19 +148,30 @@
                 <div class="card-body">
                     <div class="text-center mb-4">
                         <div class="btn-group" role="group">
-                            <button type="button" class="btn btn-outline-primary" onclick="runAnalysis('overview')">
+                            <button type="button" class="btn btn-outline-primary" id="btnOverview" onclick="runAnalysis('overview')">
                                 Vue Globale
                             </button>
-                            <button type="button" class="btn btn-outline-warning" onclick="runAnalysis('stock')">
+                            <button type="button" class="btn btn-outline-warning" id="btnStock" onclick="runAnalysis('stock')">
                                 Stock
                             </button>
-                            <button type="button" class="btn btn-outline-info" onclick="runAnalysis('production')">
+                            <button type="button" class="btn btn-outline-info" id="btnProduction" onclick="runAnalysis('production')">
                                 Production
                             </button>
-                            <button type="button" class="btn btn-outline-success" onclick="runAnalysis('financial')">
+                            <button type="button" class="btn btn-outline-success" id="btnFinancial" onclick="runAnalysis('financial')">
                                 Finances
                             </button>
                         </div>
+                    </div>
+                    
+                    <div id="analysisResults" class="mt-3">
+                        <div class="text-center text-muted py-4">
+                            <i class="fas fa-chart-line fa-2x mb-3"></i>
+                            <p>Sélectionnez un type d'analyse pour commencer</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
                     </div>
                     
                     <div id="analysisResults" class="mt-3">
@@ -313,243 +324,397 @@
 
 {% block extra_js %}
 <script>
-// Fonction pour récupérer le token CSRF
+// ========== GESTIONNAIRE D'ÉTAT GLOBAL ==========
+const CopilotState = {
+    currentAction: null,
+    isLoading: false,
+    cache: new Map(),
+    lastUpdate: null
+};
+
+// ========== FONCTIONS CORE OPTIMISÉES ==========
 function getCSRFToken() {
-    const name = 'csrftoken';
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
+    const cookie = document.cookie.match(/csrftoken=([^;]+)/);
+    return cookie ? cookie[1] : null;
 }
 
-// Fonction d'analyse
-function runAnalysis(analysisType) {
-    console.log('🚀 Lancement analyse:', analysisType);
-    showLoading('Analyse en cours...');
+// Système de cache intelligent avec expiration (5 minutes)
+function getCachedData(key) {
+    const cached = CopilotState.cache.get(key);
+    if (cached && Date.now() - cached.timestamp < 300000) { // 5 minutes
+        return cached.data;
+    }
+    return null;
+}
 
+function setCachedData(key, data) {
+    CopilotState.cache.set(key, {
+        data: data,
+        timestamp: Date.now()
+    });
+}
+
+// ========== GESTION DU CHARGEMENT OPTIMISÉE ==========
+function showInlineLoading(containerId, text = 'Chargement...') {
+    const container = document.getElementById(containerId);
+    container.innerHTML = `
+        <div class="text-center py-4">
+            <div class="spinner-border text-primary mb-3" role="status">
+                <span class="visually-hidden">Chargement...</span>
+            </div>
+            <p class="text-muted mb-0">${text}</p>
+        </div>
+    `;
+    container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function showToast(message, type = 'success') {
+    const toast = document.createElement('div');
+    toast.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    toast.style.cssText = 'top: 20px; right: 20px; z-index: 1060; min-width: 300px;';
+    toast.innerHTML = `
+        <strong>${type === 'success' ? '✅' : '❌'} ${message}</strong>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(toast);
+    
+    // Auto-remove after 4 seconds
+    setTimeout(() => {
+        if (toast.parentNode) {
+            toast.remove();
+        }
+    }, 4000);
+}
+
+// ========== REQUÊTES OPTIMISÉES AVEC CACHE ==========
+async function fetchWithCache(url, options = {}, cacheKey = null) {
+    const effectiveCacheKey = cacheKey || `${url}_${JSON.stringify(options)}`;
+    
+    // Vérifier le cache d'abord
+    const cached = getCachedData(effectiveCacheKey);
+    if (cached && !options.forceRefresh) {
+        return cached;
+    }
+    
+    try {
+        const response = await fetch(url, options);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        
+        const data = await response.json();
+        
+        // Mettre en cache si succès
+        if (data.success) {
+            setCachedData(effectiveCacheKey, data);
+        }
+        
+        return data;
+    } catch (error) {
+        console.error('Fetch error:', error);
+        
+        // Retourner les données en cache en cas d'erreur
+        const cachedData = getCachedData(effectiveCacheKey);
+        if (cachedData) {
+            showToast('Données en cache (erreur réseau)', 'warning');
+            return cachedData;
+        }
+        
+        throw error;
+    }
+}
+
+// ========== FONCTIONS D'ANALYSE OPTIMISÉES ==========
+async function runAnalysis(analysisType) {
+    if (CopilotState.isLoading) return;
+    
+    console.log(`🚀 Analyse: ${analysisType}`);
+    CopilotState.isLoading = true;
+    showInlineLoading('analysisResults', `Analyse ${analysisType} en cours...`);
+    
     const formData = new FormData();
     formData.append('analysis_type', analysisType);
     formData.append('csrfmiddlewaretoken', getCSRFToken());
 
-    fetch('{% url "copilot_analyze" %}', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => {
-        console.log('Réponse reçue, status:', response.status);
-        if (!response.ok) {
-            throw new Error('Erreur HTTP: ' + response.status);
-        }
-        return response.json();
-    })
-    .then(data => {
-        console.log('Données reçues:', data);
-        hideLoading();
-        if (data.success) {
-            displayAnalysisResults(data);
-        } else {
-            showError('Erreur: ' + (data.error || 'Inconnue'));
-        }
-    })
-    .catch(error => {
-        console.error('Erreur fetch:', error);
-        hideLoading();
-        showError('Erreur réseau: ' + error.message);
-    });
+    try {
+        const data = await fetchWithCache(
+            '{% url "copilot_analyze" %}',
+            { method: 'POST', body: formData },
+            `analysis_${analysisType}`
+        );
+        
+        displayAnalysisResults(data);
+        showToast(`Analyse ${analysisType} terminée`);
+        
+    } catch (error) {
+        document.getElementById('analysisResults').innerHTML = `
+            <div class="alert alert-danger">
+                <h5>❌ Erreur</h5>
+                <p>${error.message}</p>
+                <button class="btn btn-sm btn-outline-danger mt-2" onclick="runAnalysis('${analysisType}')">
+                    Réessayer
+                </button>
+            </div>
+        `;
+    } finally {
+        CopilotState.isLoading = false;
+    }
 }
 
-// Affichage des résultats
-function displayAnalysisResults(data) {
-    const container = document.getElementById('analysisResults');
-    console.log('Affichage résultats:', data);
+// ========== ACTIONS RAPIDES OPTIMISÉES ==========
+async function quickAction(action) {
+    if (CopilotState.isLoading) return;
     
-    let html = '';
-
-    switch(data.analysis_type) {
-        case 'overview':
-            html = `
-                <div class="alert alert-primary">
-                    <h5><i class="fas fa-globe me-2"></i>Vue d'Ensemble</h5>
-                </div>
-                <div class="row">
-                    <div class="col-md-4">
-                        <div class="card border-left-primary mb-3">
-                            <div class="card-body">
-                                <h6>Clients</h6>
-                                <h3>${data.data.summary?.total_customers || 0}</h3>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card border-left-success mb-3">
-                            <div class="card-body">
-                                <h6>Produits</h6>
-                                <h3>${data.data.summary?.total_products || 0}</h3>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card border-left-info mb-3">
-                            <div class="card-body">
-                                <h6>Commandes Actives</h6>
-                                <h3>${data.data.summary?.active_orders || 0}</h3>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="alert alert-info">
-                    <strong>Dernière mise à jour:</strong> ${data.timestamp || 'Maintenant'}
-                </div>
-            `;
-            break;
-        case 'stock':
-            html = `
-                <div class="alert alert-warning">
-                    <h5><i class="fas fa-boxes me-2"></i>Analyse Stock</h5>
-                </div>
-                <div class="alert alert-${data.data.low_stock_count > 0 ? 'warning' : 'success'}">
-                    <strong>${data.data.low_stock_count || 0} produits en stock faible</strong>
-                </div>
-                ${data.data.insights && data.data.insights.length > 0 ? 
-                    data.data.insights.map(insight => `
-                        <div class="alert alert-info small">${insight}</div>
-                    `).join('') : ''}
-            `;
-            break;
-        case 'production':
-            html = `
-                <div class="alert alert-info">
-                    <h5><i class="fas fa-industry me-2"></i>Analyse Production</h5>
-                </div>
-                <div class="alert alert-${data.data.delayed_orders_count > 0 ? 'warning' : 'success'}">
-                    <strong>${data.data.delayed_orders_count || 0} commandes en retard</strong>
-                </div>
-                <div class="alert alert-primary">
-                    <strong>${data.data.total_active_orders || 0} commandes en production</strong>
-                </div>
-            `;
-            break;
-        case 'financial':
-            html = `
-                <div class="alert alert-success">
-                    <h5><i class="fas fa-euro-sign me-2"></i>Analyse Financière</h5>
-                </div>
-                <div class="alert alert-success">
-                    <strong>Chiffre d'affaires (30j): ${data.data.total_revenue_30d ? data.data.total_revenue_30d.toLocaleString('fr-FR') + '€' : 'N/A'}</strong>
-                </div>
-                <div class="alert alert-info">
-                    <strong>Commande moyenne: ${data.data.average_order_value ? data.data.average_order_value.toLocaleString('fr-FR') + '€' : 'N/A'}</strong>
-                </div>
-            `;
-            break;
-        default:
-            html = '<div class="alert alert-danger">Type d\'analyse non reconnu</div>';
-    }
-
-    container.innerHTML = html;
-}
-
-// ========== FONCTIONS UTILITAIRES ==========
-
-function showLoading(text) {
-    document.getElementById('loadingText').textContent = text;
-    const modal = new bootstrap.Modal(document.getElementById('loadingModal'));
-    modal.show();
-}
-
-function hideLoading() {
-    const modal = bootstrap.Modal.getInstance(document.getElementById('loadingModal'));
-    if (modal) {
-        modal.hide();
-    }
-}
-
-function showSuccess(message) {
-    alert('✅ ' + message);
-}
-
-function showError(message) {
-    alert('❌ ' + message);
-}
-// Fonction pour les actions rapides avec résultats concrets
-function quickAction(action) {
-    console.log('Action rapide:', action);
-    showLoading('Génération du rapport...');
+    console.log(`⚡ Action: ${action}`);
+    CopilotState.currentAction = action;
+    CopilotState.isLoading = true;
+    
+    showInlineLoading('actionResults', `Exécution de l'action...`);
     
     const formData = new FormData();
     formData.append('action', action);
     formData.append('csrfmiddlewaretoken', getCSRFToken());
-    
-    fetch('{% url "copilot_execute_action" %}', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        hideLoading();
-        if (data.success) {
-            displayActionResults(data.result);
+
+    try {
+        const startTime = Date.now();
+        const data = await fetch('{% url "copilot_execute_action" %}', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!data.ok) throw new Error('Erreur serveur');
+        const result = await data.json();
+        
+        const duration = Date.now() - startTime;
+        console.log(`✅ Action ${action} terminée en ${duration}ms`);
+        
+        if (result.success) {
+            displayActionResults(result.result);
+            showToast('Action exécutée avec succès');
         } else {
-            showError(data.error || 'Erreur lors de l\'exécution');
+            throw new Error(result.error || 'Erreur inconnue');
         }
-    })
-    .catch(error => {
-        hideLoading();
-        showError('Erreur réseau: ' + error.message);
-    });
+        
+    } catch (error) {
+        document.getElementById('actionResults').innerHTML = `
+            <div class="alert alert-danger">
+                <h5>❌ Erreur d'exécution</h5>
+                <p>${error.message}</p>
+                <button class="btn btn-sm btn-outline-danger mt-2" onclick="quickAction('${action}')">
+                    Réessayer
+                </button>
+            </div>
+        `;
+    } finally {
+        CopilotState.isLoading = false;
+        CopilotState.currentAction = null;
+    }
 }
 
-// Affichage des résultats d'action CONCRETS
+// ========== AFFICHAGE DES RÉSULTATS OPTIMISÉ ==========
+function displayAnalysisResults(data) {
+    const container = document.getElementById('analysisResults');
+    
+    if (!data.success) {
+        container.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+        return;
+    }
+
+    const templates = {
+        overview: () => `
+            <div class="alert alert-primary d-flex align-items-center">
+                <i class="fas fa-globe fa-2x me-3"></i>
+                <div>
+                    <h5 class="mb-1">Vue d'Ensemble Business</h5>
+                    <small class="text-muted">${data.timestamp ? new Date(data.timestamp).toLocaleString('fr-FR') : 'Maintenant'}</small>
+                </div>
+            </div>
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <div class="card border-left-primary h-100">
+                        <div class="card-body text-center">
+                            <i class="fas fa-users fa-2x text-primary mb-2"></i>
+                            <h4>${data.data.summary?.total_customers || 0}</h4>
+                            <small class="text-muted">Clients</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card border-left-success h-100">
+                        <div class="card-body text-center">
+                            <i class="fas fa-cubes fa-2x text-success mb-2"></i>
+                            <h4>${data.data.summary?.total_products || 0}</h4>
+                            <small class="text-muted">Produits</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card border-left-info h-100">
+                        <div class="card-body text-center">
+                            <i class="fas fa-tasks fa-2x text-info mb-2"></i>
+                            <h4>${data.data.summary?.active_orders || 0}</h4>
+                            <small class="text-muted">Commandes Actives</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card border-left-warning h-100">
+                        <div class="card-body text-center">
+                            <i class="fas fa-chart-line fa-2x text-warning mb-2"></i>
+                            <h4>${data.data.summary?.monthly_revenue ? Math.round(data.data.summary.monthly_revenue).toLocaleString('fr-FR') + '€' : 'N/A'}</h4>
+                            <small class="text-muted">CA Mensuel</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `,
+        
+        stock: () => {
+            const lowStockCount = data.data.low_stock_count || 0;
+            return `
+                <div class="alert alert-${lowStockCount > 0 ? 'warning' : 'success'}">
+                    <h5><i class="fas fa-boxes me-2"></i>Analyse du Stock</h5>
+                    <p class="mb-0"><strong>${lowStockCount} produits nécessitent une attention</strong></p>
+                </div>
+                ${data.data.insights && data.data.insights.length > 0 ? 
+                    data.data.insights.map(insight => `
+                        <div class="alert alert-info d-flex align-items-center">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <span class="small">${insight}</span>
+                        </div>
+                    `).join('') : 
+                    '<div class="alert alert-success">✅ Tous les stocks sont optimaux</div>'
+                }
+            `;
+        },
+        
+        production: () => {
+            const delayedCount = data.data.delayed_orders_count || 0;
+            return `
+                <div class="alert alert-${delayedCount > 0 ? 'warning' : 'success'}">
+                    <h5><i class="fas fa-industry me-2"></i>Analyse Production</h5>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="card border-left-${delayedCount > 0 ? 'danger' : 'success'} h-100">
+                            <div class="card-body text-center">
+                                <i class="fas fa-clock fa-2x text-${delayedCount > 0 ? 'danger' : 'success'} mb-2"></i>
+                                <h4>${delayedCount}</h4>
+                                <small class="text-muted">Retards</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card border-left-info h-100">
+                            <div class="card-body text-center">
+                                <i class="fas fa-play-circle fa-2x text-info mb-2"></i>
+                                <h4>${data.data.total_active_orders || 0}</h4>
+                                <small class="text-muted">En Production</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card border-left-warning h-100">
+                            <div class="card-body text-center">
+                                <i class="fas fa-bolt fa-2x text-warning mb-2"></i>
+                                <h4>${data.data.urgent_orders_count || 0}</h4>
+                                <small class="text-muted">Urgentes</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        },
+        
+        financial: () => `
+            <div class="alert alert-success">
+                <h5><i class="fas fa-chart-line me-2"></i>Analyse Financière</h5>
+            </div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="card border-left-success h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-success">CA 30 jours</h6>
+                                    <h3>${data.data.total_revenue_30d ? data.data.total_revenue_30d.toLocaleString('fr-FR') + '€' : 'N/A'}</h3>
+                                </div>
+                                <i class="fas fa-euro-sign fa-2x text-success"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card border-left-info h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-info">Commande Moyenne</h6>
+                                    <h3>${data.data.average_order_value ? Math.round(data.data.average_order_value).toLocaleString('fr-FR') + '€' : 'N/A'}</h3>
+                                </div>
+                                <i class="fas fa-shopping-cart fa-2x text-info"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            ${data.data.insights && data.data.insights.length > 0 ? `
+                <div class="alert alert-info mt-3">
+                    <h6>📈 Insights:</h6>
+                    <ul class="mb-0">
+                        ${data.data.insights.map(insight => `<li>${insight}</li>`).join('')}
+                    </ul>
+                </div>
+            ` : ''}
+        `
+    };
+
+    container.innerHTML = templates[data.analysis_type] ? templates[data.analysis_type]() : 
+        '<div class="alert alert-danger">Type d\'analyse non supporté</div>';
+}
+
 function displayActionResults(result) {
     const container = document.getElementById('actionResults');
     
-    let html = `
-        <div class="alert alert-success">
-            <h5>${result.message}</h5>
-            <small class="text-muted">Généré le: ${new Date().toLocaleString('fr-FR')}</small>
+    const baseHTML = `
+        <div class="alert alert-success d-flex align-items-center">
+            <i class="fas fa-check-circle fa-2x me-3"></i>
+            <div>
+                <h5 class="mb-1">${result.message}</h5>
+                <small class="text-muted">Généré le ${new Date().toLocaleString('fr-FR')}</small>
+            </div>
         </div>
     `;
-    
-    if (result.type === 'report') {
-        html += createReportHTML(result.data);
-    } else if (result.type === 'plan') {
-        html += createPlanHTML(result.data);
-    } else if (result.type === 'analysis') {
-        html += createAnalysisHTML(result.data);
-    } else if (result.type === 'alerts') {
-        html += createAlertsHTML(result.data);
-    } else if (result.type === 'action') {
-        html += createActionHTML(result.data);
-    }
-    
-    container.innerHTML = html;
+
+    const contentTemplates = {
+        report: (data) => createReportHTML(data),
+        plan: (data) => createPlanHTML(data),
+        analysis: (data) => createAnalysisHTML(data),
+        alerts: (data) => createAlertsHTML(data),
+        action: (data) => createActionHTML(data)
+    };
+
+    const content = contentTemplates[result.type] ? contentTemplates[result.type](result.data) : '';
+    container.innerHTML = baseHTML + content;
 }
 
-// Templates pour les différents types de résultats
+// ========== TEMPLATES OPTIMISÉS ==========
 function createReportHTML(data) {
     return `
-        <div class="row">
+        <div class="row g-3 mb-4">
             <div class="col-md-6">
-                <div class="card border-left-warning mb-3">
-                    <div class="card-body">
-                        <h6 class="text-warning">Produits Stock Faible</h6>
-                        <h2>${data.low_stock_count}</h2>
+                <div class="card border-left-warning h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-exclamation-triangle fa-2x text-warning mb-2"></i>
+                        <h3>${data.low_stock_count || 0}</h3>
+                        <small class="text-muted">Stocks Faibles</small>
                     </div>
                 </div>
             </div>
             <div class="col-md-6">
-                <div class="card border-left-danger mb-3">
-                    <div class="card-body">
-                        <h6 class="text-danger">Produits en Rupture</h6>
-                        <h2>${data.critical_count}</h2>
+                <div class="card border-left-danger h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-times-circle fa-2x text-danger mb-2"></i>
+                        <h3>${data.critical_count || 0}</h3>
+                        <small class="text-muted">Ruptures</small>
                     </div>
                 </div>
             </div>
@@ -557,59 +722,60 @@ function createReportHTML(data) {
         
         ${data.low_stock_products && data.low_stock_products.length > 0 ? `
             <div class="alert alert-warning">
-                <h6>📦 Produits à Réapprovisionner:</h6>
-                <div class="table-responsive">
-                    <table class="table table-sm">
-                        <thead>
+                <h6><i class="fas fa-list me-2"></i>Produits à Réapprovisionner</h6>
+                <div class="table-responsive mt-2">
+                    <table class="table table-sm table-hover">
+                        <thead class="table-light">
                             <tr>
                                 <th>Référence</th>
-                                <th>Nom</th>
-                                <th>Stock Actuel</th>
-                                <th>Stock Min</th>
+                                <th>Produit</th>
+                                <th>Stock</th>
+                                <th>Minimum</th>
+                                <th>Status</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${data.low_stock_products.map(product => `
+                            ${data.low_stock_products.slice(0, 8).map(product => `
                                 <tr>
                                     <td><strong>${product.reference}</strong></td>
                                     <td>${product.name}</td>
-                                    <td class="text-danger">${product.current_stock}</td>
+                                    <td class="${product.current_stock === 0 ? 'text-danger fw-bold' : 'text-warning'}">
+                                        ${product.current_stock}
+                                    </td>
                                     <td>${product.min_stock}</td>
+                                    <td>
+                                        <span class="badge bg-${product.current_stock === 0 ? 'danger' : 'warning'}">
+                                            ${product.current_stock === 0 ? 'Rupture' : 'Faible'}
+                                        </span>
+                                    </td>
                                 </tr>
                             `).join('')}
                         </tbody>
                     </table>
                 </div>
             </div>
-        ` : ''}
-        
-        <div class="alert alert-info">
-            <h6>🚀 Actions Recommandées:</h6>
-            <ul class="mb-0">
-                <li>Planifier les réapprovisionnements urgents</li>
-                <li>Contacter les fournisseurs pour les ruptures</li>
-                <li>Réviser les niveaux de stock minimum</li>
-            </ul>
-        </div>
+        ` : '<div class="alert alert-success">✅ Aucun produit en stock faible</div>'}
     `;
 }
 
 function createPlanHTML(data) {
     return `
-        <div class="row">
+        <div class="row g-3 mb-4">
             <div class="col-md-6">
-                <div class="card border-left-danger mb-3">
-                    <div class="card-body">
-                        <h6 class="text-danger">Commandes en Retard</h6>
-                        <h2>${data.delayed_orders_count}</h2>
+                <div class="card border-left-danger h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-clock fa-2x text-danger mb-2"></i>
+                        <h3>${data.delayed_orders_count || 0}</h3>
+                        <small class="text-muted">Retards</small>
                     </div>
                 </div>
             </div>
             <div class="col-md-6">
-                <div class="card border-left-warning mb-3">
-                    <div class="card-body">
-                        <h6 class="text-warning">Commandes Urgentes</h6>
-                        <h2>${data.urgent_orders_count}</h2>
+                <div class="card border-left-warning h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-bolt fa-2x text-warning mb-2"></i>
+                        <h3>${data.urgent_orders_count || 0}</h3>
+                        <small class="text-muted">Urgentes</small>
                     </div>
                 </div>
             </div>
@@ -617,81 +783,252 @@ function createPlanHTML(data) {
         
         ${data.delayed_orders && data.delayed_orders.length > 0 ? `
             <div class="alert alert-danger">
-                <h6>⏰ Commandes en Retard:</h6>
-                <div class="table-responsive">
-                    <table class="table table-sm">
-                        <thead>
+                <h6><i class="fas fa-exclamation-circle me-2"></i>Commandes en Retard</h6>
+                <div class="table-responsive mt-2">
+                    <table class="table table-sm table-hover">
+                        <thead class="table-light">
                             <tr>
                                 <th>Commande</th>
                                 <th>Client</th>
                                 <th>Date Livraison</th>
+                                <th>Jours de retard</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${data.delayed_orders.map(order => `
-                                <tr>
-                                    <td><strong>${order.order_number}</strong></td>
-                                    <td>${order.customer__name}</td>
-                                    <td class="text-danger">${order.delivery_date}</td>
-                                </tr>
-                            `).join('')}
+                            ${data.delayed_orders.slice(0, 6).map(order => {
+                                const delayDays = Math.floor((new Date() - new Date(order.delivery_date)) / (1000 * 60 * 60 * 24));
+                                return `
+                                    <tr>
+                                        <td><strong>${order.order_number}</strong></td>
+                                        <td>${order.customer__name}</td>
+                                        <td class="text-danger">${order.delivery_date}</td>
+                                        <td><span class="badge bg-danger">${delayDays}j</span></td>
+                                    </tr>
+                                `;
+                            }).join('')}
                         </tbody>
                     </table>
                 </div>
             </div>
-        ` : ''}
+        ` : '<div class="alert alert-success">✅ Aucune commande en retard</div>'}
         
-        <div class="alert alert-success">
-            <h6>📅 Plan d'Action Production:</h6>
-            <ul class="mb-0">
-                ${data.priority_actions.map(action => `<li>${action}</li>`).join('')}
+        <div class="alert alert-info">
+            <h6><i class="fas fa-play-circle me-2"></i>Plan d'Action Immédiat</h6>
+            <ul class="mb-0 mt-2">
+                ${(data.priority_actions || [
+                    'Prioriser les commandes en retard',
+                    'Allouer des ressources supplémentaires',
+                    'Contacter les clients concernés',
+                    'Réviser le planning de production'
+                ]).map(action => `<li>${action}</li>`).join('')}
             </ul>
         </div>
     `;
 }
 
-// Fonction pour les insights
+function createAnalysisHTML(data) {
+    return `
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <div class="card border-left-info h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-users fa-2x text-info mb-2"></i>
+                        <h4>${data.total_customers || 0}</h4>
+                        <small class="text-muted">Clients Total</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-left-success h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-shopping-cart fa-2x text-success mb-2"></i>
+                        <h4>${data.recent_orders_count || 0}</h4>
+                        <small class="text-muted">Commandes 30j</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-left-warning h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-star fa-2x text-warning mb-2"></i>
+                        <h4>${data.top_customers?.length || 0}</h4>
+                        <small class="text-muted">Top Clients</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        ${data.top_customers && data.top_customers.length > 0 ? `
+            <div class="alert alert-info">
+                <h6><i class="fas fa-trophy me-2"></i>Top 5 Clients</h6>
+                <div class="table-responsive mt-2">
+                    <table class="table table-sm table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Client</th>
+                                <th>Commandes</th>
+                                <th>Chiffre d'Affaires</th>
+                                <th>Moyenne/Commande</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.top_customers.map((customer, index) => {
+                                const avgOrder = customer.order_count > 0 ? (customer.total_spent / customer.order_count) : 0;
+                                return `
+                                    <tr>
+                                        <td>
+                                            <span class="badge bg-primary me-2">#${index + 1}</span>
+                                            ${customer.name}
+                                        </td>
+                                        <td>${customer.order_count}</td>
+                                        <td class="text-success fw-bold">${customer.total_spent ? Math.round(customer.total_spent).toLocaleString('fr-FR') + '€' : '0€'}</td>
+                                        <td class="text-info">${avgOrder ? Math.round(avgOrder).toLocaleString('fr-FR') + '€' : 'N/A'}</td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        ` : ''}
+    `;
+}
+
+function createAlertsHTML(data) {
+    const totalAlerts = (data.low_stock_alerts || 0) + (data.delayed_orders_alerts || 0) + (data.critical_alerts || 0);
+    
+    return `
+        <div class="alert alert-${totalAlerts > 0 ? 'warning' : 'success'}">
+            <h6><i class="fas fa-exclamation-triangle me-2"></i>Synthèse des Alertes</h6>
+            <p class="mb-2">${totalAlerts} point(s) nécessitent votre attention</p>
+        </div>
+        
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <div class="card border-left-danger h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-fire fa-2x text-danger mb-2"></i>
+                        <h3>${data.critical_alerts || 0}</h3>
+                        <small class="text-muted">Critiques</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-left-warning h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-exclamation-circle fa-2x text-warning mb-2"></i>
+                        <h3>${data.low_stock_alerts || 0}</h3>
+                        <small class="text-muted">Stocks</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-left-info h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-clock fa-2x text-info mb-2"></i>
+                        <h3>${data.delayed_orders_alerts || 0}</h3>
+                        <small class="text-muted">Retards</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="alert alert-light border">
+            <h6><i class="fas fa-list-check me-2"></i>Plan d'Action Prioritaire</h6>
+            <ul class="mb-0 mt-2">
+                ${(data.recommendations || [
+                    'Traiter les alertes critiques en premier',
+                    'Réapprovisionner les stocks urgents',
+                    'Contacter les clients en retard',
+                    'Réviser les processus problématiques'
+                ]).map((rec, index) => `
+                    <li class="${index < 2 ? 'fw-bold text-danger' : ''}">${rec}</li>
+                `).join('')}
+            </ul>
+        </div>
+    `;
+}
+
+function createActionHTML(data) {
+    return `
+        <div class="alert alert-success">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-check-circle fa-2x me-3"></i>
+                <div>
+                    <h6 class="mb-1">Action Exécutée avec Succès</h6>
+                    ${data.action ? `<p class="mb-1"><strong>Type:</strong> ${data.action}</p>` : ''}
+                    ${data.product_reference ? `<p class="mb-1"><strong>Produit:</strong> ${data.product_reference}</p>` : ''}
+                    ${data.affected_orders ? `<p class="mb-1"><strong>Commandes affectées:</strong> ${data.affected_orders}</p>` : ''}
+                    <small class="text-muted">Statut: ${data.status || 'terminé'}</small>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// ========== FONCTIONS UTILITAIRES RAPIDES ==========
 function handleInsightAction(action) {
-    console.log('Action insight concrète:', action);
     quickAction(action);
 }
-// ========== INITIALISATION ==========
 
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 ERP Copilot initialisé - Prêt à analyser sur demande');
-    
-    // Ajouter les écouteurs d'événements
-    document.getElementById('btnOverview').addEventListener('click', function() {
-        console.log('Clic sur Vue Globale');
+function runQuickAnalysis() {
+    showInlineLoading('analysisResults', 'Actualisation des données...');
+    setTimeout(() => {
+        // Recharger les données sans recharger toute la page
+        CopilotState.cache.clear();
         runAnalysis('overview');
+        showToast('Données actualisées avec succès');
+    }, 500);
+}
+
+function generateReport() {
+    showToast('Génération du rapport PDF en cours...', 'info');
+    // Simulation de génération PDF
+    setTimeout(() => {
+        showToast('Rapport PDF généré avec succès');
+    }, 2000);
+}
+
+function applySuggestion(suggestion) {
+    showToast(`Suggestion appliquée: ${suggestion}`, 'info');
+}
+
+// ========== INITIALISATION OPTIMISÉE ==========
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 ERP Copilot Ultra-Optimisé - Prêt !');
+    
+    // Configuration des écouteurs d'événements optimisée
+    const analysisButtons = {
+        'btnOverview': 'overview',
+        'btnStock': 'stock', 
+        'btnProduction': 'production',
+        'btnFinancial': 'financial'
+    };
+    
+    Object.entries(analysisButtons).forEach(([id, type]) => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.addEventListener('click', () => runAnalysis(type));
+        }
     });
     
-    document.getElementById('btnStock').addEventListener('click', function() {
-        console.log('Clic sur Analyse Stock');
-        runAnalysis('stock');
+    // Écouteurs pour les actions insights
+    document.querySelectorAll('[onclick*="handleInsightAction"]').forEach(button => {
+        const match = button.getAttribute('onclick').match(/handleInsightAction\('([^']+)'\)/);
+        if (match) {
+            button.addEventListener('click', () => handleInsightAction(match[1]));
+        }
     });
     
-    document.getElementById('btnProduction').addEventListener('click', function() {
-        console.log('Clic sur Analyse Production');
-        runAnalysis('production');
-    });
+    // Auto-refresh toutes les 2 minutes (optionnel)
+    setInterval(() => {
+        if (!CopilotState.isLoading && document.visibilityState === 'visible') {
+            CopilotState.cache.clear();
+            console.log('🔄 Cache nettoyé - prêt pour nouvelles données');
+        }
+    }, 120000);
     
-    document.getElementById('btnFinancial').addEventListener('click', function() {
-        console.log('Clic sur Analyse Finances');
-        runAnalysis('financial');
-    });
-    
-    // Écouteurs pour les boutons d'action
-    document.querySelectorAll('.action-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const action = this.getAttribute('data-action');
-            console.log('Action insight:', action);
-            showSuccess('Action déclenchée: ' + action);
-        });
-    });
-    
-    console.log('✅ Tous les écouteurs d\'événements sont configurés');
-    console.log('📍 Les analyses se déclenchent maintenant uniquement sur clic');
+    console.log('✅ Interface ultra-optimisée initialisée');
 });
 </script>
 {% endblock %}

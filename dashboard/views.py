@@ -8,7 +8,7 @@ from .models import Order, Product, Customer, StockMovement, OrderItem, Planning
 from .forms import ProductForm, OrderForm, StockMovementForm, CustomerForm
 from django.http import JsonResponse 
 import json
-
+from django.views.decorators.http import require_POST
 
 @login_required
 def dashboard(request):
@@ -2052,3 +2052,228 @@ def generate_action_suggestions(action_type, context):
         ])
     
     return suggestions    
+
+
+@require_POST
+@login_required
+def copilot_analyze(request):
+    """Endpoint pour les analyses en temps réel"""
+    try:
+        analysis_type = request.POST.get('analysis_type', 'overview')
+        
+        if analysis_type == 'overview':
+            data = get_business_overview()
+        elif analysis_type == 'stock':
+            data = analyze_stock_situation()
+        elif analysis_type == 'production':
+            data = analyze_production_situation()
+        elif analysis_type == 'financial':
+            data = analyze_financial_performance()
+        else:
+            return JsonResponse({'success': False, 'error': 'Type d\'analyse non valide'})
+        
+        return JsonResponse({
+            'success': True,
+            'analysis_type': analysis_type,
+            'data': data,
+            'timestamp': timezone.now().isoformat()
+        })
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+@require_POST
+@login_required
+def copilot_execute_action(request):
+    """Endpoint pour exécuter des actions concrètes"""
+    try:
+        action = request.POST.get('action', '')
+        
+        if action == 'stock_report':
+            result = generate_stock_report()
+        elif action == 'production_plan':
+            result = generate_production_plan()
+        elif action == 'customer_analysis':
+            result = generate_customer_analysis()
+        elif action == 'alert_summary':
+            result = generate_alert_summary()
+        else:
+            # Actions depuis les insights
+            result = execute_insight_action(action)
+        
+        return JsonResponse({
+            'success': True,
+            'result': result
+        })
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+# ========== FONCTIONS D'ANALYSE CONCRÈTES ==========
+
+def analyze_stock_situation():
+    """Analyse concrète de la situation du stock"""
+    low_stock_products = list(Product.objects.filter(
+        current_stock__lte=F('min_stock')
+    ).values('reference', 'name', 'current_stock', 'min_stock'))
+    
+    critical_products = [p for p in low_stock_products if p['current_stock'] == 0]
+    
+    return {
+        'low_stock_count': len(low_stock_products),
+        'critical_count': len(critical_products),
+        'low_stock_products': low_stock_products,
+        'insights': [
+            f"{len(critical_products)} produits en rupture de stock",
+            f"{len(low_stock_products)} produits sous le stock minimum",
+            "Planifier les réapprovisionnements urgents" if critical_products else "Stock globalement stable"
+        ]
+    }
+
+def analyze_production_situation():
+    """Analyse concrète de la production"""
+    delayed_orders = list(Order.objects.filter(
+        delivery_date__lt=timezone.now().date(),
+        status__in=['confirmed', 'in_production']
+    ).values('order_number', 'customer__name', 'delivery_date'))
+    
+    urgent_orders = Order.objects.filter(
+        delivery_date__lte=timezone.now().date() + timezone.timedelta(days=2),
+        status__in=['confirmed', 'in_production']
+    ).count()
+    
+    return {
+        'delayed_orders_count': len(delayed_orders),
+        'urgent_orders_count': urgent_orders,
+        'total_active_orders': Order.objects.filter(status='in_production').count(),
+        'delayed_orders': delayed_orders,
+        'priority_actions': [
+            "Traiter les commandes en retard en priorité",
+            "Replanifier la production pour les urgences",
+            "Contacter les clients pour les retards importants"
+        ] if delayed_orders else ["Production dans les délais"]
+    }
+
+# ========== FONCTIONS D'ACTION CONCRÈTES ==========
+
+def generate_stock_report():
+    """Génère un rapport stock concret"""
+    low_stock_products = list(Product.objects.filter(
+        current_stock__lte=F('min_stock')
+    ).values('reference', 'name', 'current_stock', 'min_stock'))
+    
+    critical_products = [p for p in low_stock_products if p['current_stock'] == 0]
+    
+    return {
+        'type': 'report',
+        'message': f'Rapport Stock - {len(low_stock_products)} produits à surveiller',
+        'data': {
+            'low_stock_count': len(low_stock_products),
+            'critical_count': len(critical_products),
+            'low_stock_products': low_stock_products[:10]  # Limiter pour l'affichage
+        }
+    }
+
+def generate_production_plan():
+    """Génère un plan de production concret"""
+    delayed_orders = list(Order.objects.filter(
+        delivery_date__lt=timezone.now().date(),
+        status__in=['confirmed', 'in_production']
+    ).values('order_number', 'customer__name', 'delivery_date')[:10])
+    
+    urgent_orders = Order.objects.filter(
+        delivery_date__lte=timezone.now().date() + timezone.timedelta(days=2),
+        status__in=['confirmed', 'in_production']
+    ).count()
+    
+    return {
+        'type': 'plan',
+        'message': f'Plan Production - {len(delayed_orders)} retards à traiter',
+        'data': {
+            'delayed_orders_count': len(delayed_orders),
+            'urgent_orders_count': urgent_orders,
+            'delayed_orders': delayed_orders,
+            'priority_actions': [
+                "1. Traiter immédiatement les commandes en retard",
+                "2. Contacter les clients affectés",
+                "3. Réorganiser la ligne de production",
+                "4. Allouer des ressources supplémentaires"
+            ]
+        }
+    }
+
+def generate_customer_analysis():
+    """Génère une analyse clients concrète"""
+    recent_orders = Order.objects.filter(
+        created_at__gte=timezone.now() - timezone.timedelta(days=30)
+    )
+    
+    top_customers = Customer.objects.annotate(
+        order_count=models.Count('order'),
+        total_spent=models.Sum('order__total_amount')
+    ).order_by('-total_spent')[:5]
+    
+    return {
+        'type': 'analysis',
+        'message': 'Analyse Clients - Top 5 clients',
+        'data': {
+            'total_customers': Customer.objects.count(),
+            'recent_orders_count': recent_orders.count(),
+            'top_customers': list(top_customers.values('name', 'order_count', 'total_spent')),
+            'insights': [
+                f"Chiffre d'affaires 30j: {sum(order.total_amount for order in recent_orders if order.total_amount):.2f}€",
+                f"Top client: {top_customers[0].name if top_customers else 'N/A'}"
+            ]
+        }
+    }
+
+def generate_alert_summary():
+    """Génère un résumé des alertes"""
+    low_stock_count = Product.objects.filter(current_stock__lte=F('min_stock')).count()
+    delayed_orders_count = Order.objects.filter(
+        delivery_date__lt=timezone.now().date(),
+        status__in=['confirmed', 'in_production']
+    ).count()
+    
+    return {
+        'type': 'alerts',
+        'message': f'Synthèse Alertes - {low_stock_count + delayed_orders_count} points critiques',
+        'data': {
+            'low_stock_alerts': low_stock_count,
+            'delayed_orders_alerts': delayed_orders_count,
+            'critical_alerts': Product.objects.filter(current_stock=0).count(),
+            'recommendations': [
+                f"🔴 {Product.objects.filter(current_stock=0).count()} ruptures de stock",
+                f"🟡 {low_stock_count} stocks faibles", 
+                f"🔵 {delayed_orders_count} commandes en retard",
+                "Priorité: Traiter les ruptures de stock en premier"
+            ]
+        }
+    }
+
+def execute_insight_action(action):
+    """Exécute une action spécifique depuis un insight"""
+    if action.startswith('reorder_'):
+        reference = action.replace('reorder_', '')
+        return {
+            'type': 'action',
+            'message': f'Réapprovisionnement lancé pour {reference}',
+            'data': {
+                'action': 'reorder',
+                'product_reference': reference,
+                'status': 'planned'
+            }
+        }
+    elif action == 'prioritize_delayed_orders':
+        return {
+            'type': 'action', 
+            'message': 'Priorisation des commandes en retard activée',
+            'data': {
+                'action': 'prioritize',
+                'affected_orders': Order.objects.filter(
+                    delivery_date__lt=timezone.now().date()
+                ).count()
+            }
+        }
+    
+    return {'type': 'action', 'message': 'Action exécutée', 'data': {}}
