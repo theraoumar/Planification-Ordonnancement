@@ -32,60 +32,63 @@
                         <p class="card-text">{{ product.name }}</p>
                         <div class="row text-muted small">
                             <div class="col-6">
-                                <strong>Prix:</strong><br>
-                                {{ product.price }} €
+                                <strong>Prix de vente:</strong><br>
+                                {{ product.selling_price }} €  {# CORRIGÉ #}
                             </div>
                             <div class="col-6">
-                                <strong>Stock:</strong><br>
-                                {{ product.current_stock }} unités
+                                <strong>Stock actuel:</strong><br>
+                                {{ product.current_stock }} unités  {# MÉTHODE OU PROPRIÉTÉ? #}
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {% if order_items_count > 0 %}
+                {# SECTION OPTIONNELLE - Si vous voulez garder un avertissement #}
+                {% with commandes_actives=product.orderitem_set.filter.order.status.in.confirmed.in_production.count %}
+                {% if commandes_actives > 0 %}
                 <div class="alert alert-warning">
                     <i class="fas fa-exclamation-circle me-2"></i>
-                    <strong>Attention !</strong> Ce produit est utilisé dans {{ order_items_count }} commande(s) active(s).
-                    
+                    <strong>Information :</strong> Ce produit est utilisé dans {{ commandes_actives }} commande(s) active(s).
                     <div class="mt-2">
-                        <strong>Commandes concernées :</strong>
-                        <ul class="mb-0 mt-1">
-                            {% for item in product.orderitem_set.all %}
-                                {% if item.order.status in 'draft,confirmed,in_production,shipped' %}
-                                <li>
-                                    {{ item.order.order_number }} - {{ item.order.customer.name }}
-                                    (Quantité: {{ item.quantity }}, Statut: {{ item.order.get_status_display }})
-                                </li>
-                                {% endif %}
-                            {% endfor %}
-                        </ul>
-                    </div>
-                    
-                    <div class="mt-2">
-                        <small>
-                            Pour supprimer ce produit, vous devez d'abord :
-                            <ul class="mb-0">
-                                <li>Annuler les commandes actives qui l'utilisent</li>
-                                <li>Ou changer les produits dans ces commandes</li>
-                                <li>Ou archiver le produit au lieu de le supprimer</li>
-                            </ul>
+                        <small class="text-muted">
+                            <strong>Note :</strong> La suppression est maintenant autorisée même avec des commandes actives.
+                            Le système gérera automatiquement les stocks.
                         </small>
                     </div>
                 </div>
                 {% endif %}
+                {% endwith %}
+
+                {# ALTERNATIVE SIMPLE - Sans vérification #}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Nouveau système :</strong> La suppression est maintenant directe.
+                    {% if product.current_stock > 0 %}
+                    <br><small>Le stock actuel ({{ product.current_stock }} unités) sera automatiquement mis à zéro.</small>
+                    {% endif %}
+                </div>
 
                 <form method="post">
                     {% csrf_token %}
+                    
+                    {# CHAMP CACHÉ POUR CONFIRMER LA SUPPRESSION #}
+                    <input type="hidden" name="confirm_delete" value="true">
+                    
+                    <div class="mb-3">
+                        <label for="reason" class="form-label">
+                            <strong>Raison de la suppression (optionnel) :</strong>
+                        </label>
+                        <input type="text" class="form-control" id="reason" name="reason" 
+                               placeholder="Ex: Produit obsolète, remplacement...">
+                    </div>
+
                     <div class="d-grid gap-2 d-md-flex justify-content-md-center">
                         <a href="{% url 'product_list' %}" class="btn btn-secondary me-md-2">
                             <i class="fas fa-times me-1"></i>Annuler
                         </a>
-                        {% if order_items_count == 0 %}
-                        <button type="submit" class="btn btn-danger">
+                        <button type="submit" class="btn btn-danger" onclick="return confirm('Êtes-vous ABSOLUMENT sûr ? Cette action est irréversible.')">
                             <i class="fas fa-trash me-1"></i>Confirmer la suppression
                         </button>
-                        {% endif %}
                     </div>
                 </form>
             </div>

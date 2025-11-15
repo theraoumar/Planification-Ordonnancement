@@ -422,29 +422,49 @@ def edit_product(request, product_id):
 def delete_product(request, product_id):
     product = get_object_or_404(Product, id=product_id)
     
-    # Vérifier si le produit est utilisé dans des commandes NON ANNULÉES
+    if request.method == 'POST':
+        # SUPPRESSION DIRECTE - Plus de vérification des commandes
+        product_name = product.reference
+        
+        # OPTIONNEL : Enregistrer la raison de la suppression
+        reason = request.POST.get('reason', 'Suppression manuelle')
+        
+        # CORRIGÉ : current_stock est un champ, pas une méthode
+        current_stock = product.current_stock  # Sans parenthèses !
+        
+        # OPTIONNEL : Créer un mouvement de stock pour mettre à zéro le stock restant
+        if current_stock > 0:
+            StockMovement.objects.create(
+                product=product,
+                movement_type='out',
+                quantity=current_stock,
+                reason=f'Suppression produit - {reason}',
+                user=request.user
+            )
+            stock_message = f" (stock de {current_stock} unités mis à zéro)"
+        else:
+            stock_message = ""
+        
+        # SUPPRESSION DU PRODUIT
+        product.delete()
+        
+        messages.success(request, 
+            f'✅ Produit {product_name} supprimé avec succès!{stock_message}'
+        )
+        return redirect('product_list')
+    
+    # Pour la requête GET, on prépare les données pour le template
+    # On peut optionnellement compter les commandes pour information (mais pas pour bloquer)
     order_items_count = OrderItem.objects.filter(
         product=product,
         order__status__in=['draft', 'confirmed', 'in_production', 'shipped']
     ).count()
     
-    if request.method == 'POST':
-        if order_items_count > 0:
-            messages.error(request, 
-                f'Impossible de supprimer {product.reference} car il est utilisé dans {order_items_count} commande(s) active(s). '
-                f'Annulez d\'abord ces commandes ou archivez le produit.'
-            )
-        else:
-            product_name = product.reference
-            product.delete()
-            messages.success(request, f'Produit {product_name} supprimé avec succès!')
-        return redirect('product_list')
-    
     return render(request, 'dashboard/products/delete_product.html', {
         'product': product,
-        'order_items_count': order_items_count
+        'order_items_count': order_items_count  # Maintenant juste pour information
     })
-
+    
 @login_required
 def adjust_stock(request, product_id):
     product = get_object_or_404(Product, id=product_id)

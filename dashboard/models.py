@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Sum
 from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
 
@@ -98,8 +99,7 @@ class Order(models.Model):
     
     def update_stock_on_confirm(self):
         """Diminue le stock quand une commande est confirmée"""
-        if self.status == 'confirmed':
-            for item in self.items.all():
+        for item in self.items.all():
                 if item.product.current_stock >= item.quantity:
                     item.product.current_stock -= item.quantity
                     item.product.save()
