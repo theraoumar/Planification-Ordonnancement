@@ -1,0 +1,101 @@
+<!-- templates/dashboard/includes/notifications.html -->
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 9999;">
+    {% for notification in notifications %}
+    <div class="toast show" role="alert" data-notification-id="{{ notification.id }}">
+        <div class="toast-header 
+            {% if notification.notification_type == 'delayed_order' %}bg-danger text-white
+            {% elif notification.notification_type == 'upcoming_delivery' %}bg-warning
+            {% elif notification.notification_type == 'low_stock' %}bg-warning
+            {% else %}bg-info text-white{% endif %}">
+            
+            {% if notification.notification_type == 'delayed_order' %}
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            {% elif notification.notification_type == 'upcoming_delivery' %}
+            <i class="fas fa-calendar-day me-2"></i>
+            {% elif notification.notification_type == 'low_stock' %}
+            <i class="fas fa-exclamation-circle me-2"></i>
+            {% else %}
+            <i class="fas fa-info-circle me-2"></i>
+            {% endif %}
+            
+            <strong class="me-auto">{{ notification.title }}</strong>
+            <small class="text-muted">{{ notification.created_at|timesince }}</small>
+            <button type="button" class="btn-close btn-close-white" 
+                    onclick="markAsRead('{{ notification.id }}')"></button>
+        </div>
+        <div class="toast-body">
+            {{ notification.message }}
+            {% if notification.related_order %}
+            <div class="mt-2">
+                <a href="{% url 'order_detail' notification.related_order.id %}" 
+                   class="btn btn-sm btn-outline-primary">
+                    Voir la commande
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<script>
+function markAsRead(notificationId) {
+    fetch(`/notifications/${notificationId}/mark-read/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const toast = document.querySelector(`[data-notification-id="${notificationId}"]`);
+            if (toast) {
+                const bsToast = new bootstrap.Toast(toast);
+                bsToast.hide();
+            }
+            updateNotificationCount();
+        }
+    });
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function updateNotificationCount() {
+    fetch('/notifications/unread-count/')
+    .then(response => response.json())
+    .then(data => {
+        const badge = document.getElementById('notificationBadge');
+        if (badge) {
+            if (data.count > 0) {
+                badge.textContent = data.count;
+                badge.style.display = 'inline-block';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+    });
+}
+
+// Fermer automatiquement après 10 secondes
+setTimeout(() => {
+    document.querySelectorAll('.toast').forEach(toast => {
+        const bsToast = new bootstrap.Toast(toast);
+        bsToast.hide();
+    });
+}, 10000);
+</script>

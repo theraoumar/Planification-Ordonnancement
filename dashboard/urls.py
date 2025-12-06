@@ -6,7 +6,12 @@ urlpatterns = [
     # Dashboard
     path('', views.dashboard, name='dashboard'),
     
-    # Commandes - TOUT regrouper ici
+    path('notifications/', views.notifications_list, name='notifications_list'),
+    path('notifications/<int:notification_id>/mark-read/', views.mark_notification_read, name='mark_notification_read'),
+    path('notifications/mark-all-read/', views.mark_all_notifications_read, name='mark_all_notifications_read'),
+    path('notifications/<int:notification_id>/delete/', views.delete_notification, name='delete_notification'),
+    path('notifications/clear-all/', views.clear_all_notifications, name='clear_all_notifications'),
+    path('notifications/unread-count/', views.get_unread_count, name='get_unread_count'),
     # Clients
     path('customers/', views.customer_list, name='customer_list'),
     path('customers/new/', views.create_customer, name='create_customer'),
@@ -17,6 +22,7 @@ urlpatterns = [
     path('orders/<int:order_id>/edit/', views.edit_order, name='edit_order'),
     path('orders/<int:order_id>/delete/', views.delete_order, name='delete_order'),
     path('orders/<int:order_id>/update-status/', views.update_order_status, name='update_order_status'),
+    path('order/<int:order_id>/invoice/pdf/', views.download_invoice_pdf, name='download_invoice_pdf'),
     
     # Produits & Stock - TOUT regrouper ici
     path('products/', views.product_list, name='product_list'),

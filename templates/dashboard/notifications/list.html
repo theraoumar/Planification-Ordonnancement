@@ -1,0 +1,406 @@
+{% extends 'base.html' %}
+
+{% block title %}Notifications - ERP Copilot{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-bell me-2"></i>Notifications
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <button class="btn btn-outline-secondary me-2" onclick="markAllAsRead()">
+            <i class="fas fa-check-double me-1"></i>Tout marquer comme lu
+        </button>
+        <button class="btn btn-outline-danger" onclick="clearAllNotifications()">
+            <i class="fas fa-trash me-1"></i>Tout effacer
+        </button>
+    </div>
+</div>
+
+<!-- Statistiques -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white shadow">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-white-50 text-uppercase mb-1">
+                            Total Notifications
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold">{{ notifications.count }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-bell fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-dark shadow">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-dark text-uppercase mb-1">
+                            En retard
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold">
+                            {{ delayed_orders_count }}
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-exclamation-triangle fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white shadow">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-white-50 text-uppercase mb-1">
+                            Livraisons proches
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold">
+                            {{ upcoming_deliveries_count }}
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-calendar-day fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-danger text-white shadow">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-white-50 text-uppercase mb-1">
+                            Stocks faibles
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold">
+                            {{ low_stock_count }}
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-box fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filtres -->
+<div class="card shadow mb-4">
+    <div class="card-header bg-light">
+        <h6 class="mb-0">Filtres</h6>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3 mb-2">
+                <select class="form-select" id="typeFilter">
+                    <option value="">Tous les types</option>
+                    <option value="delayed_order">Commandes en retard</option>
+                    <option value="upcoming_delivery">Livraisons proches</option>
+                    <option value="low_stock">Stocks faibles</option>
+                    <option value="info">Informations</option>
+                </select>
+            </div>
+            <div class="col-md-3 mb-2">
+                <select class="form-select" id="statusFilter">
+                    <option value="">Tous les statuts</option>
+                    <option value="unread">Non lues</option>
+                    <option value="read">Lues</option>
+                </select>
+            </div>
+            <div class="col-md-4 mb-2">
+                <input type="text" class="form-control" id="searchFilter" placeholder="Rechercher...">
+            </div>
+            <div class="col-md-2 mb-2">
+                <button class="btn btn-primary w-100" onclick="applyFilters()">
+                    <i class="fas fa-filter me-1"></i>Filtrer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Liste des notifications -->
+<div class="card shadow">
+    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">Liste des notifications</h6>
+        <span class="badge bg-primary">{{ notifications.count }} notification(s)</span>
+    </div>
+    <div class="card-body p-0">
+        {% if notifications %}
+        <div class="list-group list-group-flush">
+            {% for notification in notifications %}
+            <div class="list-group-item {% if not notification.is_read %}bg-light{% endif %} notification-item" 
+                 data-type="{{ notification.notification_type }}"
+                 data-status="{% if notification.is_read %}read{% else %}unread{% endif %}">
+                <div class="d-flex w-100 justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                        <div class="d-flex align-items-center mb-1">
+                            {% if notification.notification_type == 'delayed_order' %}
+                            <i class="fas fa-exclamation-triangle text-danger me-2"></i>
+                            {% elif notification.notification_type == 'upcoming_delivery' %}
+                            <i class="fas fa-calendar-day text-warning me-2"></i>
+                            {% elif notification.notification_type == 'low_stock' %}
+                            <i class="fas fa-exclamation-circle text-warning me-2"></i>
+                            {% else %}
+                            <i class="fas fa-info-circle text-info me-2"></i>
+                            {% endif %}
+                            
+                            <h6 class="mb-0">
+                                {{ notification.title }}
+                                {% if not notification.is_read %}
+                                <span class="badge bg-primary ms-2">Nouveau</span>
+                                {% endif %}
+                            </h6>
+                        </div>
+                        <p class="mb-1">{{ notification.message }}</p>
+                        <small class="text-muted">
+                            <i class="fas fa-clock me-1"></i>
+                            {{ notification.created_at|date:"d/m/Y à H:i" }}
+                            • Type: {{ notification.get_notification_type_display }}
+                            
+                            {% if notification.related_order %}
+                            • Commande: 
+                            <a href="{% url 'order_detail' notification.related_order.id %}" class="text-decoration-none">
+                                {{ notification.related_order.order_number }}
+                            </a>
+                            {% endif %}
+                        </small>
+                    </div>
+                    <div class="ms-3">
+                        <div class="btn-group btn-group-sm">
+                            {% if not notification.is_read %}
+                            <button class="btn btn-outline-success" onclick="markAsRead('{{ notification.id }}')">
+                                <i class="fas fa-check"></i> Marquer comme lu
+                            </button>
+                            {% endif %}
+                            <button class="btn btn-outline-danger" onclick="deleteNotification('{{ notification.id }}')">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-bell-slash fa-3x text-muted mb-3"></i>
+            <h5 class="text-muted">Aucune notification</h5>
+            <p class="text-muted">Vous n'avez pas encore de notifications.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Scripts -->
+<script>
+// Filtrage des notifications
+function applyFilters() {
+    const typeFilter = document.getElementById('typeFilter').value;
+    const statusFilter = document.getElementById('statusFilter').value;
+    const searchFilter = document.getElementById('searchFilter').value.toLowerCase();
+    
+    document.querySelectorAll('.notification-item').forEach(item => {
+        let show = true;
+        
+        // Filtre par type
+        if (typeFilter && item.dataset.type !== typeFilter) {
+            show = false;
+        }
+        
+        // Filtre par statut
+        if (statusFilter && item.dataset.status !== statusFilter) {
+            show = false;
+        }
+        
+        // Filtre par recherche
+        if (searchFilter) {
+            const text = item.textContent.toLowerCase();
+            if (!text.includes(searchFilter)) {
+                show = false;
+            }
+        }
+        
+        item.style.display = show ? '' : 'none';
+    });
+}
+
+// Marquer une notification comme lue
+function markAsRead(notificationId) {
+    fetch(`/notifications/${notificationId}/mark-read/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Mettre à jour l'interface
+            const item = document.querySelector(`[onclick="markAsRead('${notificationId}')"]`).closest('.notification-item');
+            item.classList.remove('bg-light');
+            item.dataset.status = 'read';
+            
+            // Supprimer le badge "Nouveau"
+            const badge = item.querySelector('.badge.bg-primary');
+            if (badge) badge.remove();
+            
+            // Mettre à jour le bouton
+            const button = item.querySelector('[onclick^="markAsRead"]');
+            button.outerHTML = '<button class="btn btn-outline-secondary btn-sm" disabled><i class="fas fa-check"></i> Lu</button>';
+            
+            updateNotificationCount();
+        }
+    });
+}
+
+// Marquer toutes comme lues
+function markAllAsRead() {
+    if (!confirm('Marquer toutes les notifications comme lues ?')) return;
+    
+    fetch('/notifications/mark-all-read/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Mettre à jour l'interface
+            document.querySelectorAll('.notification-item').forEach(item => {
+                item.classList.remove('bg-light');
+                item.dataset.status = 'read';
+                
+                const badge = item.querySelector('.badge.bg-primary');
+                if (badge) badge.remove();
+                
+                const button = item.querySelector('[onclick^="markAsRead"]');
+                if (button) {
+                    button.outerHTML = '<button class="btn btn-outline-secondary btn-sm" disabled><i class="fas fa-check"></i> Lu</button>';
+                }
+            });
+            
+            updateNotificationCount();
+            alert('Toutes les notifications ont été marquées comme lues.');
+        }
+    });
+}
+
+// Supprimer une notification
+function deleteNotification(notificationId) {
+    if (!confirm('Supprimer cette notification ?')) return;
+    
+    fetch(`/notifications/${notificationId}/delete/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Supprimer de l'interface
+            const item = document.querySelector(`[onclick="deleteNotification('${notificationId}')"]`).closest('.notification-item');
+            item.remove();
+            
+            updateNotificationCount();
+        }
+    });
+}
+
+// Effacer toutes les notifications
+function clearAllNotifications() {
+    if (!confirm('Supprimer toutes les notifications ? Cette action est irréversible.')) return;
+    
+    fetch('/notifications/clear-all/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Vider la liste
+            document.querySelector('.list-group').innerHTML = `
+                <div class="text-center py-5">
+                    <i class="fas fa-bell-slash fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">Aucune notification</h5>
+                    <p class="text-muted">Vous n'avez pas encore de notifications.</p>
+                </div>
+            `;
+            
+            updateNotificationCount();
+            alert('Toutes les notifications ont été supprimées.');
+        }
+    });
+}
+
+// Mettre à jour le compteur de notifications
+function updateNotificationCount() {
+    fetch('/notifications/unread-count/')
+    .then(response => response.json())
+    .then(data => {
+        const badge = document.getElementById('notificationBadge');
+        if (badge) {
+            if (data.count > 0) {
+                badge.textContent = data.count;
+                badge.style.display = 'inline-block';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+    });
+}
+
+// Fonction pour récupérer le token CSRF
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Appliquer les filtres au chargement si paramètres d'URL
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const type = urlParams.get('type');
+    const status = urlParams.get('status');
+    
+    if (type) {
+        document.getElementById('typeFilter').value = type;
+    }
+    if (status) {
+        document.getElementById('statusFilter').value = status;
+    }
+    
+    if (type || status) {
+        applyFilters();
+    }
+});
+</script>
+{% endblock %}

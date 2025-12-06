@@ -4,14 +4,232 @@ from django.contrib import messages
 from django.db.models import Q, F, Sum, Count
 from django.utils import timezone
 from django.db import models
-from .models import Order, Product, Customer, StockMovement, OrderItem, PlanningEvent, AIConversation, AIAnalysis
+from .models import Order, Product, Customer, StockMovement, OrderItem, PlanningEvent, AIConversation, AIAnalysis, Notification, NotificationManager
 from .forms import ProductForm, OrderForm, StockMovementForm, CustomerForm
-from django.http import JsonResponse 
+from django.http import JsonResponse, HttpResponse
 import json
 from django.views.decorators.http import require_POST
+from django.template.loader import get_template
+import io
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4, letter
+from reportlab.lib import colors
+from reportlab.platypus import Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import cm, inch
+from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+from datetime import datetime
+
+@login_required
+def download_invoice_pdf(request, order_id):
+    order = get_object_or_404(Order, id=order_id)
+    
+    # Créer le buffer PDF
+    buffer = io.BytesIO()
+    
+    # Créer le document PDF
+    p = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+    
+    # --------------------- EN-TÊTE ---------------------
+    p.setFont("Helvetica-Bold", 20)
+    p.setFillColor(colors.HexColor("#007bff"))
+    p.drawString(2*cm, height - 2*cm, "ERP COPILOT")
+    
+    p.setFont("Helvetica", 10)
+    p.setFillColor(colors.gray)
+    p.drawString(2*cm, height - 2.5*cm, "Système de Gestion Intelligente")
+    
+    # Informations entreprise
+    p.setFont("Helvetica", 9)
+    p.setFillColor(colors.black)
+    p.drawString(2*cm, height - 3.2*cm, "123 Rue de la Technologie, 75000 Paris")
+    p.drawString(2*cm, height - 3.7*cm, "Tél: +33 1 23 45 67 89 | Email: facturation@erp-copilot.com")
+    p.drawString(2*cm, height - 4.2*cm, "SIRET: 123 456 789 00010 | TVA: FR12345678901")
+    
+    # Titre FACTURE
+    p.setFont("Helvetica-Bold", 24)
+    p.setFillColor(colors.HexColor("#dc3545"))
+    p.drawRightString(width - 2*cm, height - 2*cm, "FACTURE")
+    
+    # Numéro de facture
+    p.setFont("Helvetica-Bold", 14)
+    p.setFillColor(colors.black)
+    p.drawRightString(width - 2*cm, height - 3*cm, f"N°: {order.order_number}")
+    
+    # Date
+    p.setFont("Helvetica", 10)
+    p.drawRightString(width - 2*cm, height - 3.5*cm, f"Date: {order.created_at.strftime('%d/%m/%Y')}")
+    
+    # Ligne de séparation
+    p.setStrokeColor(colors.HexColor("#007bff"))
+    p.setLineWidth(2)
+    p.line(2*cm, height - 5*cm, width - 2*cm, height - 5*cm)
+    
+    # --------------------- SECTION CLIENT ---------------------
+    p.setFillColor(colors.black)
+    p.setFont("Helvetica-Bold", 12)
+    p.drawString(2*cm, height - 6*cm, "CLIENT:")
+    
+    # Informations client
+    p.setFont("Helvetica", 10)
+    y = height - 6.5*cm
+    p.drawString(2*cm, y, f"{order.customer.name}")
+    y -= 0.5*cm
+    p.drawString(2*cm, y, f"Email: {order.customer.email}")
+    y -= 0.5*cm
+    p.drawString(2*cm, y, f"Tél: {order.customer.phone}")
+    y -= 0.5*cm
+    
+    # Ligne de séparation
+    p.setStrokeColor(colors.lightgrey)
+    p.setLineWidth(0.5)
+    p.line(2*cm, height - 8*cm, width - 2*cm, height - 8*cm)
+    
+    # --------------------- TABLEAU DES PRODUITS ---------------------
+    p.setFont("Helvetica-Bold", 14)
+    p.setFillColor(colors.HexColor("#007bff"))
+    p.drawString(2*cm, height - 9*cm, "DÉTAIL DE LA COMMANDE")
+    
+    # En-têtes du tableau
+    headers = ['Produit', 'Référence', 'Quantité', 'Prix HT', 'Total HT']
+    col_widths = [7*cm, 3*cm, 2*cm, 3*cm, 3*cm]
+    
+    data = [headers]
+    
+    # Ajouter les produits - CORRIGÉ : utiliser total_amount
+    for item in order.items.all():
+        # Calculer le total de la ligne
+        line_total = item.quantity * item.unit_price
+        
+        data.append([
+            item.product.name[:40],
+            item.product.reference,
+            str(item.quantity),
+            f"{item.unit_price:.2f} €",
+            f"{line_total:.2f} €"  # Utiliser le calcul direct
+        ])
+    
+    # Créer la table
+    table = Table(data, colWidths=col_widths)
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#007bff")),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
+        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+        ('ALIGN', (2, 1), (-1, -1), 'CENTER'),
+        ('ALIGN', (0, 1), (1, -1), 'LEFT'),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+    ]))
+    
+    # Positionner la table
+    table.wrapOn(p, width, height)
+    table.drawOn(p, 2*cm, height - 14*cm)
+    
+    # --------------------- TOTAUX ---------------------
+    y_position = height - 17*cm
+    
+    # Calculer les totaux
+    subtotal = float(order.total_amount)
+    tva = subtotal * 0.20
+    total_ttc = subtotal + tva
+    
+    # Ligne de séparation
+    p.setStrokeColor(colors.black)
+    p.setLineWidth(1)
+    p.line(width - 12*cm, y_position, width - 2*cm, y_position)
+    y_position -= 1*cm
+    
+    # Sous-total HT
+    p.setFont("Helvetica", 10)
+    p.drawString(width - 12*cm, y_position, "Sous-total HT:")
+    p.drawRightString(width - 2*cm, y_position, f"{subtotal:.2f} €")
+    y_position -= 0.7*cm
+    
+    # TVA
+    p.drawString(width - 12*cm, y_position, "TVA (20%):")
+    p.drawRightString(width - 2*cm, y_position, f"{tva:.2f} €")
+    y_position -= 0.7*cm
+    
+    # Ligne de séparation épaisse
+    p.setStrokeColor(colors.black)
+    p.setLineWidth(2)
+    p.line(width - 12*cm, y_position - 0.3*cm, width - 2*cm, y_position - 0.3*cm)
+    y_position -= 0.7*cm
+    
+    # Total TTC
+    p.setFont("Helvetica-Bold", 12)
+    p.setFillColor(colors.HexColor("#dc3545"))
+    p.drawString(width - 12*cm, y_position, "TOTAL TTC:")
+    p.drawRightString(width - 2*cm, y_position, f"{total_ttc:.2f} €")
+    
+    # --------------------- CONDITIONS DE PAIEMENT ---------------------
+    y_position -= 2*cm
+    p.setFillColor(colors.black)
+    p.setFont("Helvetica-Bold", 11)
+    p.drawString(2*cm, y_position, "CONDITIONS DE PAIEMENT")
+    
+    p.setFont("Helvetica", 9)
+    y_position -= 0.6*cm
+    p.drawString(2*cm, y_position, f"Date d'échéance: {order.delivery_date.strftime('%d/%m/%Y')}")
+    y_position -= 0.5*cm
+    p.drawString(2*cm, y_position, "Mode de paiement: Virement bancaire")
+    y_position -= 0.5*cm
+    p.drawString(2*cm, y_position, "IBAN: FR76 3000 4000 5000 6000 7000 890")
+    y_position -= 0.5*cm
+    p.drawString(2*cm, y_position, "BIC: BNPAFRPPXXX")
+    
+    # --------------------- PIED DE PAGE ---------------------
+    p.setFont("Helvetica-Oblique", 8)
+    p.setFillColor(colors.gray)
+    p.drawCentredString(width/2, 2*cm, 
+        "Facture générée automatiquement par ERP Copilot")
+    
+    # Date de génération
+    p.drawCentredString(width/2, 1.5*cm, 
+        f"Générée le {datetime.now().strftime('%d/%m/%Y à %H:%M')}")
+    
+    # --------------------- FINALISATION ---------------------
+    p.showPage()
+    p.save()
+    
+    # Préparer la réponse
+    buffer.seek(0)
+    response = HttpResponse(buffer, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="Facture_{order.order_number}.pdf"'
+    
+    return response
 
 @login_required
 def dashboard(request):
+    # Générer les notifications automatiques
+    NotificationManager.generate_all_notifications(request.user)
+    
+    # Récupérer les notifications non lues
+    notifications = Notification.objects.filter(
+        user=request.user, 
+        is_read=False
+    ).order_by('-created_at')[:10]  # Limiter à 10
+    
+    # KPIs
+    active_orders = Order.objects.filter(status__in=['confirmed', 'in_production']).count()
+    
+    low_stock_products = []
+    for product in Product.objects.all():
+        if product.needs_reorder():
+            low_stock_products.append(product)
+    
+    delayed_orders = Order.objects.filter(
+        delivery_date__lt=timezone.now().date(), 
+        status__in=['confirmed', 'in_production']
+    ).count()
+    
     # Données réelles de la base de données
     context = {
         'active_orders': Order.objects.filter(status='in_production').count(),
@@ -2297,3 +2515,53 @@ def execute_insight_action(action):
         }
     
     return {'type': 'action', 'message': 'Action exécutée', 'data': {}}
+
+
+@login_required
+def notifications_list(request):
+    notifications = Notification.objects.filter(
+        user=request.user
+    ).order_by('-created_at')
+    
+    # Marquer toutes comme lues quand on visite la page
+    if request.method == 'GET':
+        Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
+    
+    return render(request, 'dashboard/notifications/list.html', {
+        'notifications': notifications
+    })
+
+@login_required
+def mark_notification_read(request, notification_id):
+    """Marque une notification comme lue (API)"""
+    notification = get_object_or_404(Notification, id=notification_id, user=request.user)
+    notification.is_read = True
+    notification.save()
+    
+    return JsonResponse({'success': True})
+
+@login_required
+def get_unread_count(request):
+    """Retourne le nombre de notifications non lues (API)"""
+    count = Notification.objects.filter(user=request.user, is_read=False).count()
+    return JsonResponse({'count': count})
+
+# dashboard/views.py - Ajoutez ces vues
+@login_required
+def mark_all_notifications_read(request):
+    """Marque toutes les notifications comme lues"""
+    Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
+    return JsonResponse({'success': True})
+
+@login_required
+def delete_notification(request, notification_id):
+    """Supprime une notification"""
+    notification = get_object_or_404(Notification, id=notification_id, user=request.user)
+    notification.delete()
+    return JsonResponse({'success': True})
+
+@login_required
+def clear_all_notifications(request):
+    """Supprime toutes les notifications de l'utilisateur"""
+    Notification.objects.filter(user=request.user).delete()
+    return JsonResponse({'success': True})
