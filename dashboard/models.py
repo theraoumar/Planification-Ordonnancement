@@ -107,46 +107,30 @@ class Order(models.Model):
     def update_stock_on_confirm(self):
         """Diminue le stock quand une commande est confirmée"""
         for item in self.items.all():
-                if item.product.current_stock >= item.quantity:
-                    item.product.current_stock -= item.quantity
-                    item.product.save()
-                    
-                    # Enregistrer le mouvement de stock
-                    StockMovement.objects.create(
-                        product=item.product,
-                        movement_type='out',
-                        quantity=item.quantity,
-                        reason=f'Commande {self.order_number}',
-                        user=self.customer  # ou l'utilisateur connecté
-                    )
-                else:
-                    raise ValueError(f"Stock insuffisant pour {item.product.reference}")
+            if item.product.current_stock >= item.quantity:
+                item.product.current_stock -= item.quantity
+                item.product.save()
+            else:
+                raise ValueError(f"Stock insuffisant pour {item.product.reference}")
     
     def restore_stock_on_cancel(self):
         """Restaure le stock quand une commande est annulée"""
-        if self.status == 'cancelled':
-            for item in self.items.all():
-                item.product.current_stock += item.quantity
-                item.product.save()
-                
-                # Enregistrer le mouvement de stock
-                StockMovement.objects.create(
-                    product=item.product,
-                    movement_type='in',
-                    quantity=item.quantity,
-                    reason=f'Annulation commande {self.order_number}',
-                    user=self.customer
-                )
+        for item in self.items.all():
+            item.product.current_stock += item.quantity
+            item.product.save()
     
     def save(self, *args, **kwargs):
         """Override save pour gérer automatiquement les stocks"""
         old_status = None
         if self.pk:
-            old_status = Order.objects.get(pk=self.pk).status
+            try:
+                old_status = Order.objects.get(pk=self.pk).status
+            except Order.DoesNotExist:
+                old_status = None
         
         super().save(*args, **kwargs)
         
-        # Gestion automatique des stocks
+        # Gestion automatique des stocks - NE PAS créer de StockMovement ici
         try:
             if old_status != self.status:
                 if self.status == 'confirmed' and old_status != 'confirmed':
@@ -212,7 +196,10 @@ class StockMovement(models.Model):
     quantity = models.IntegerField()
     reason = models.CharField(max_length=100)
     created_at = models.DateTimeField(auto_now_add=True)
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='dashboard_stock_movements')    
+    # Garder l'utilisateur comme champ principal
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='dashboard_stock_movements')
+    # Ajouter optionnellement un champ pour le customer
+    customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True, blank=True, related_name='stock_movements')
     
     def __str__(self):
         return f"{self.product.reference} - {self.movement_type} - {self.quantity}"

@@ -20,12 +20,14 @@
             bottom: 0;
             left: 0;
             z-index: 1000;
-            padding: 48px 0 0;
+            padding: 0;
             box-shadow: 2px 0 5px rgba(0,0,0,0.1);
             width: 250px;
             background-color: #2c3e50;
             transition: transform 0.3s ease;
             transform: translateX(0);
+            display: flex;
+            flex-direction: column;
         }
         
         /* Sidebar fermé */
@@ -35,19 +37,39 @@
         
         .sidebar-sticky {
             position: relative;
-            top: 0;
-            height: calc(100vh - 48px);
-            padding-top: .5rem;
-            overflow-x: hidden;
+            height: 100vh;
             overflow-y: auto;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+        }
+        
+        /* Header du sidebar */
+        .sidebar-header {
+            padding: 1.5rem 1rem;
+            border-bottom: 1px solid #34495e;
+            flex-shrink: 0;
+            background-color: #2c3e50;
+        }
+        
+        /* Navigation - prend l'espace disponible */
+        .sidebar .nav {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem 0;
         }
         
         .sidebar .nav-link {
             font-weight: 500;
             color: #ecf0f1;
-            padding: 0.75rem 1rem;
+            padding: 0.85rem 1.5rem;
             border-left: 3px solid transparent;
             transition: all 0.3s;
+            margin: 2px 0;
+            display: flex;
+            align-items: center;
+            position: relative;
         }
         
         .sidebar .nav-link:hover {
@@ -58,14 +80,15 @@
         
         .sidebar .nav-link.active {
             color: #3498db;
-            background-color: #34495e;
+            background-color: rgba(52, 152, 219, 0.1);
             border-left-color: #3498db;
         }
         
         .sidebar .nav-link i {
-            margin-right: 10px;
+            margin-right: 12px;
             width: 20px;
             text-align: center;
+            font-size: 1.1rem;
         }
         
         /* Bouton toggle fixe */
@@ -109,34 +132,33 @@
         }
         
         .sidebar:not(.collapsed) + .sidebar-toggle {
-            left: 265px; /* 250px + 15px */
+            left: 265px;
         }
         
-        /* Header du sidebar */
-        .sidebar .text-center {
-            padding: 1.5rem 1rem;
-            border-bottom: 1px solid #34495e;
+        .sidebar-header h5 {
+            color: #3498db !important;
+            margin-bottom: 0.5rem;
+            font-size: 1.2rem;
         }
         
-        .sidebar h5 {
-            color: #ecf0f1;
-            margin-bottom: 0.2rem;
-        }
-        
-        .sidebar .text-muted {
-            color: #bdc3c7 !important;
+        .sidebar-header small {
+            color: #bdc3c7;
+            font-size: 0.85rem;
         }
         
         /* User info en bas */
-        .sidebar .position-absolute {
+        .user-info-container {
+            margin-top: auto;
             padding: 1rem;
             background-color: #34495e;
+            border-top: 1px solid #455a64;
+            flex-shrink: 0;
         }
         
         /* Responsive */
         @media (max-width: 768px) {
             .sidebar {
-                width: 220px;
+                width: 280px;
             }
             
             .sidebar:not(.collapsed) + .sidebar-toggle {
@@ -150,6 +172,7 @@
             /* Sur mobile, le sidebar prend toute la largeur */
             .sidebar:not(.collapsed) {
                 width: 100%;
+                max-width: 320px;
                 transform: translateX(0);
             }
             
@@ -208,9 +231,10 @@
         .nav-link.erp-copilot {
             background: linear-gradient(135deg, #1cc88a, #13855c);
             color: white !important;
-            margin: 10px 15px;
+            margin: 20px 15px 10px 15px;
             border-radius: 8px;
             border-left: 3px solid #0f6e4a !important;
+            padding: 0.85rem 1.5rem;
         }
         
         .nav-link.erp-copilot:hover {
@@ -226,8 +250,9 @@
         /* Badge de notification */
         .notification-badge {
             position: absolute;
-            top: 5px;
-            right: 5px;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
             background: #dc3545;
             color: white;
             border-radius: 50%;
@@ -238,6 +263,15 @@
             align-items: center;
             justify-content: center;
         }
+
+        /* Pour le lien Assistant AI */
+        .nav-link.text-info {
+            color: #17a2b8 !important;
+        }
+        
+        .nav-link.text-info:hover {
+            color: #138496 !important;
+        }
     </style>
 </head>
 <body>
@@ -245,7 +279,7 @@
     <nav class="sidebar" id="sidebar">
         <div class="sidebar-sticky">
             <!-- Logo -->
-            <div class="text-center">
+            <div class="sidebar-header text-center">
                 <h5 class="text-primary">
                     <i class="fas fa-robot"></i> ERP Copilot
                 </h5>
@@ -253,7 +287,7 @@
             </div>      
             
             <!-- Navigation -->
-            <ul class="nav flex-column mt-3">
+            <ul class="nav flex-column">
                 <li class="nav-item">
                     <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" 
                     href="{% url 'dashboard' %}">
@@ -301,14 +335,14 @@
                     </a>
                 </li>
                 
-                <li class="nav-item mt-4">
-                    <a class="nav-link erp-copilot" href="#">
+                <li class="nav-item">
+                    <a class="nav-link erp-copilot" href="{% url 'erp_copilot' %}">
                         <i class="fas fa-rocket"></i>
                         ERP Copilot
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link text-info" href="#">
+                    <a class="nav-link text-info" href="{% url 'ai_assistant' %}">
                         <i class="fas fa-robot"></i>
                         Assistant AI
                     </a>
@@ -316,18 +350,18 @@
             </ul>
             
             <!-- User info en bas -->
-            <div class="position-absolute bottom-0 start-0 end-0 border-top bg-light">
-                <div class="d-flex align-items-center p-2">
+            <div class="user-info-container">
+                <div class="d-flex align-items-center">
                     <div class="flex-grow-1">
                         <small class="text-muted d-block">Connecté en tant que</small>
-                        <div class="fw-bold text-dark small">{{ user.username }}</div>
+                        <div class="fw-bold text-light small">{{ user.username }}</div>
                         {% if user.role %}
-                        <small class="text-muted">{{ user.get_role_display }}</small>
+                        <small class="text-light opacity-75">{{ user.get_role_display }}</small>
                         {% endif %}
                     </div>
                     <form method="post" action="{% url 'logout' %}" class="m-0">
                         {% csrf_token %}
-                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Déconnexion">
+                        <button type="submit" class="btn btn-sm btn-outline-light" title="Déconnexion">
                             <i class="fas fa-sign-out-alt"></i>
                         </button>
                     </form>

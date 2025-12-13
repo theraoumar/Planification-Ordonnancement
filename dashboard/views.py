@@ -507,10 +507,20 @@ def update_order_status(request, order_id):
     order = get_object_or_404(Order, id=order_id)
     old_status = order.status
     
+    # Dictionnaire des statuts et leurs affichages
+    status_display = {
+        'draft': 'Brouillon',
+        'confirmed': 'Confirmée', 
+        'in_production': 'En production',
+        'shipped': 'Expédiée',
+        'delivered': 'Livrée',
+        'cancelled': 'Annulée'
+    }
+    
     if request.method == 'POST':
         new_status = request.POST.get('status')
         
-        if new_status in dict(Order.STATUS_CHOICES):
+        if new_status in status_display:
             
             # ========== GESTION STOCK - CONFIRMATION ==========
             if new_status == 'confirmed' and old_status != 'confirmed':
@@ -528,50 +538,39 @@ def update_order_status(request, order_id):
                         "\n".join(stock_problems)
                     )
                     return redirect('order_detail', order_id=order.id)
-                
-                # Diminuer le stock des produits
-                for item in order.items.all():
-                    product = item.product
-                    product.current_stock -= item.quantity
-                    product.save()
-                    
-                    # Enregistrer le mouvement de stock
-                    StockMovement.objects.create(
-                        product=product,
-                        movement_type='out',
-                        quantity=item.quantity,
-                        reason=f'Commande {order.order_number}',
-                        user=request.user
-                    )
-                
-                messages.success(request, f"✅ Stock diminué pour {order.order_number}")
-            
-            # ========== GESTION STOCK - ANNULATION ==========
-            elif new_status == 'cancelled' and old_status in ['confirmed', 'in_production']:
-                # Restaurer le stock des produits
-                for item in order.items.all():
-                    product = item.product
-                    product.current_stock += item.quantity
-                    product.save()
-                    
-                    # Enregistrer le mouvement de stock
-                    StockMovement.objects.create(
-                        product=product,
-                        movement_type='in',
-                        quantity=item.quantity,
-                        reason=f'Annulation commande {order.order_number}',
-                        user=request.user
-                    )
-                
-                messages.success(request, f"✅ Stock restauré pour {order.order_number}")
             
             # Changer le statut de la commande
             order.status = new_status
             order.save()
             
-            messages.success(request, 
-                f'📦 Statut de {order.order_number} changé : "{order.get_status_display(old_status)}" → "{order.get_status_display()}"'
-            )
+            # ========== ENREGISTRER LES MOUVEMENTS DE STOCK ==========
+            if new_status == 'confirmed' and old_status != 'confirmed':
+                for item in order.items.all():
+                    StockMovement.objects.create(
+                        product=item.product,
+                        movement_type='out',
+                        quantity=item.quantity,
+                        reason=f'Commande {order.order_number}',
+                        user=request.user
+                    )
+                messages.success(request, f"✅ Commande confirmée et stock mis à jour pour {order.order_number}")
+            
+            elif new_status == 'cancelled' and old_status in ['confirmed', 'in_production']:
+                for item in order.items.all():
+                    StockMovement.objects.create(
+                        product=item.product,
+                        movement_type='in',
+                        quantity=item.quantity,
+                        reason=f'Annulation commande {order.order_number}',
+                        user=request.user
+                    )
+                messages.success(request, f"✅ Commande annulée et stock restauré pour {order.order_number}")
+            
+            else:
+                messages.success(request, 
+                    f'📦 Statut de {order.order_number} changé : ' +
+                    f'"{status_display.get(old_status, old_status)}" → "{status_display.get(new_status, new_status)}"'
+                )
     
     return redirect('order_detail', order_id=order.id)
 
