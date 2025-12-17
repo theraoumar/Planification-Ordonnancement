@@ -11,9 +11,11 @@
         <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary me-2">
             <i class="fas fa-arrow-left me-1"></i>Dashboard
         </a>
+        {% if user.role == 'admin' or user.role == 'manager' or user.role == 'supervisor' %}
         <a href="{% url 'create_order' %}" class="btn btn-primary">
             <i class="fas fa-plus me-1"></i>Nouvelle Commande
         </a>
+        {% endif %}
     </div>
 </div>
 
@@ -165,6 +167,7 @@
                                     </span>
                                 </td>
                                 <td><strong>{{ order.total_amount }} €</strong></td>
+                                {% if user.role == 'admin' or user.role == 'manager' or user.role == 'supervisor' %}
                                 <td>
                                     <div class="btn-group btn-group-sm">
                                         <a href="{% url 'order_detail' order.id %}" class="btn btn-outline-primary" title="Voir">
@@ -178,6 +181,13 @@
                                         </a>
                                     </div>
                                 </td>
+                                {% else %}
+                                <td>
+                                    <a href="{% url 'order_detail' order.id %}" class="btn btn-outline-primary btn-sm" title="Voir">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                </td>
+                                {% endif %}
                             </tr>
                             {% empty %}
                             <tr>

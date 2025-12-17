@@ -9,6 +9,7 @@ class CustomUser(AbstractUser):
     ROLE_CHOICES = [
         ('admin', 'Administrateur'),
         ('manager', 'Manager'),
+        ('supervisor', 'Superviseur'),  # Rôle secondaire avec accès limité
         ('operator', 'Opérateur'),
     ]
     
