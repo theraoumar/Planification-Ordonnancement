@@ -1,0 +1,235 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus ERP - Système de Gestion Avancé</title>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{% static 'css/login.css' %}">
+    <style>
+        /* Home Page Specific Overrides */
+        .home-container {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .hero-section {
+            height: 100vh;
+            background-image: url('{% static "img/home_bg.png" %}');
+            background-size: cover;
+            background-position: center;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .hero-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(10, 25, 50, 0.6);
+            z-index: 1;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 2;
+            text-align: center;
+            color: white;
+            padding: 2rem;
+            max-width: 800px;
+        }
+
+        .hero-logo {
+            font-size: 80px;
+            color: #3498db;
+            margin-bottom: 1.5rem;
+            text-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .hero-title {
+            font-size: 4rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .hero-subtitle {
+            font-size: 1.5rem;
+            margin-bottom: 3rem;
+            opacity: 0.9;
+            font-weight: 300;
+        }
+
+        /* Top Bar */
+        .home-nav {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 1.5rem 3rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+        }
+
+        .nav-logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+        }
+
+        .nav-logo i {
+            color: #3498db;
+        }
+
+        .btn-home-login {
+            background: #3498db;
+            color: white;
+            padding: 0.8rem 2rem;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+        }
+
+        .btn-home-login:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+        }
+
+        .btn-hero-cta {
+            background: transparent;
+            border: 2px solid white;
+            color: white;
+            padding: 1rem 2.5rem;
+            border-radius: 50px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s;
+            margin-top: 1rem;
+            display: inline-block;
+        }
+
+        .btn-hero-cta:hover {
+            background: white;
+            color: #2c3e50;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="home-container">
+        <!-- Navigation -->
+        <nav class="home-nav">
+            <a href="#" class="nav-logo">
+                <i class="fas fa-network-wired"></i> Nexus ERP
+            </a>
+            <a href="{% url 'login' %}" class="btn-home-login">Connexion</a>
+        </nav>
+
+        <!-- Hero Section -->
+        <section class="hero-section">
+            <div class="hero-overlay"></div>
+
+            <div class="hero-content">
+                <div class="hero-logo">
+                    <i class="fas fa-industry"></i>
+                </div>
+                <h1 class="hero-title">Nexus ERP</h1>
+                <p class="hero-subtitle">Votre Intelligence au Service d'une Production Plus Agile, Plus Efficace, Plus
+                    Durable</p>
+
+                <a href="{% url 'login' %}" class="btn-hero-cta">Accéder à mon espace</a>
+            </div>
+
+            <div class="glass-hex" style="bottom: 10%; right: 10%;"></div>
+            <div class="glass-hex" style="top: 20%; left: 10%;"></div>
+        </section>
+
+        <!-- Features Section (Reused from login) -->
+        <section class="features-section" id="features">
+            <h2 class="features-headline">
+                L'Industrie 4.0 à Portée de Main<br>
+                <span style="color: #3498db;">Optimisez Votre Cycle de Production</span>
+            </h2>
+
+            <div class="features-grid">
+                <div class="feature-card blue">
+                    <h3>Planification Automatisée</h3>
+                    <p>
+                        Anticipez et maîtrisez vos délais. Notre moteur de planification intelligent synchronise vos
+                        ressources, matériaux et commandes pour garantir un flux de production optimal sans goulots
+                        d'étranglement.
+                    </p>
+                </div>
+
+                <div class="feature-card dark">
+                    <h3>Ordonnancement Optimisé</h3>
+                    <p>
+                        Maximisez votre rendement. L'algorithme d'IA analyse vos contraintes en temps réel pour proposer
+                        les séquences de fabrication les plus efficaces, réduisant les temps de changement et les coûts
+                        opérationnels.
+                    </p>
+                </div>
+
+                <div class="feature-card green">
+                    <h3>Gestion de Production Intelligente</h3>
+                    <p>
+                        Visibilité totale, Décision rapide. Suivez l'avancement de chaque ordre de fabrication, détectez
+                        les anomalies instantanément et assurez une qualité constante grâce à notre monitoring
+                        prédictif.
+                    </p>
+                </div>
+            </div>
+
+            <div class="features-footer">
+                <div class="footer-col">
+                    <h4>Découvrez Nexus ERP</h4>
+                    <ul>
+                        <li><a href="#">Nos solutions</a></li>
+                        <li><a href="#">Pourquoi nous ?</a></li>
+                        <li><a href="#">Demander une démo</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-col">
+                    <h4>Faisons connaissance</h4>
+                    <ul>
+                        <li><a href="#">Nous trouver</a></li>
+                        <li><a href="#">Nous rejoindre</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-col">
+                    <h4>Nous contacter</h4>
+                    <ul>
+                        <li><span>Support Client</span></li>
+                        <li><span>contact@nexuserp.com</span></li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+    </div>
+
+</body>
+
+</html>

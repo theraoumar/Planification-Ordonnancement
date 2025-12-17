@@ -207,6 +207,14 @@ def download_invoice_pdf(request, order_id):
     
     return response
 
+def home(request):
+    """Page d'accueil publique"""
+    if request.user.is_authenticated:
+        return redirect('dashboard')
+    return render(request, 'dashboard/home.html')
+
+
+
 @login_required
 def dashboard(request):
     # Générer les notifications automatiques

@@ -1,0 +1,220 @@
+import os
+
+file_path = r"c:\Users\juana\Planification-Ordonnancement\templates\dashboard\orders\order_list.html"
+
+content = r"""{% extends 'base.html' %}
+
+{% block title %}Commandes - ERP Copilot{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-shopping-cart me-2"></i>Liste des Commandes
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary me-2">
+            <i class="fas fa-arrow-left me-1"></i>Dashboard
+        </a>
+        {% if user.role == 'admin' or user.role == 'manager' or user.role == 'supervisor' %}
+        <a href="{% url 'create_order' %}" class="btn btn-primary">
+            <i class="fas fa-plus me-1"></i>Nouvelle Commande
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Filtres et recherche -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <form method="get" class="row g-3 align-items-center">
+                    <div class="col-md-4">
+                        <input type="text" name="search" class="form-control" 
+                               placeholder="Rechercher par numéro ou client..." 
+                               value="{{ search_query }}">
+                    </div>
+                    <div class="col-md-3">
+                        <select name="status" class="form-select">
+                            <option value="">Tous les statuts</option>
+                            <option value="draft" {% if status_filter == 'draft' %}selected{% endif %}>Brouillon</option>
+                            <option value="confirmed" {% if status_filter == 'confirmed' %}selected{% endif %}>Confirmée</option>
+                            <option value="in_production" {% if status_filter == 'in_production' %}selected{% endif %}>En production</option>
+                            <option value="shipped" {% if status_filter == 'shipped' %}selected{% endif %}>Expédiée</option>
+                            <option value="delivered" {% if status_filter == 'delivered' %}selected{% endif %}>Livrée</option>
+                            <option value="cancelled" {% if status_filter == 'cancelled' %}selected{% endif %}>Annulée</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-search me-1"></i>Filtrer
+                        </button>
+                    </div>
+                    <div class="col-md-2">
+                        <a href="{% url 'order_list' %}" class="btn btn-outline-secondary w-100">
+                            <i class="fas fa-refresh me-1"></i>Réinitialiser
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Statistiques -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-2">
+                        <div class="card bg-primary text-white">
+                            <div class="card-body py-2">
+                                <h5 class="card-title">{{ total_orders }}</h5>
+                                <p class="card-text small">Total</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="card bg-secondary text-white">
+                            <div class="card-body py-2">
+                                <h5 class="card-title">{{ draft_orders }}</h5>
+                                <p class="card-text small">Brouillons</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="card bg-warning text-dark">
+                            <div class="card-body py-2">
+                                <h5 class="card-title">{{ production_orders }}</h5>
+                                <p class="card-text small">En production</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="card bg-info text-white">
+                            <div class="card-body py-2">
+                                <h5 class="card-title">{{ confirmed_orders }}</h5>
+                                <p class="card-text small">Confirmées</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="card bg-success text-white">
+                            <div class="card-body py-2">
+                                <h5 class="card-title">{{ shipped_orders }}</h5>
+                                <p class="card-text small">Expédiées</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="card bg-danger text-white">
+                            <div class="card-body py-2">
+                                <h5 class="card-title">{{ delayed_orders }}</h5>
+                                <p class="card-text small">En retard</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tableau des commandes -->
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Commandes ({{ orders.count }})</h5>
+                <div>
+                    <span class="badge bg-light text-dark me-2">{{ orders.count }} résultat(s)</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>Numéro</th>
+                                <th>Client</th>
+                                <th>Date création</th>
+                                <th>Date livraison</th>
+                                <th>Statut</th>
+                                <th>Montant</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in orders %}
+                            <tr>
+                                <td>
+                                    <strong>{{ order.order_number }}</strong>
+                                    {% if order.is_delayed %}
+                                    <i class="fas fa-exclamation-triangle text-danger ms-1" title="Commande en retard"></i>
+                                    {% endif %}
+                                </td>
+                                <td>{{ order.customer.name }}</td>
+                                <td>{{ order.created_at|date:"d/m/Y" }}</td>
+                                <td class="{% if order.is_delayed %}text-danger fw-bold{% endif %}">
+                                    {{ order.delivery_date|date:"d/m/Y" }}
+                                </td>
+                                <td>
+                                    <span class="badge 
+                                        {% if order.status == 'draft' %}bg-secondary
+                                        {% elif order.status == 'confirmed' %}bg-primary
+                                        {% elif order.status == 'in_production' %}bg-warning
+                                        {% elif order.status == 'shipped' %}bg-success
+                                        {% elif order.status == 'delivered' %}bg-info
+                                        {% else %}bg-dark{% endif %}">
+                                        {{ order.get_status_display }}
+                                    </span>
+                                </td>
+                                <td><strong>{{ order.total_amount }} €</strong></td>
+                                {% if user.role == 'admin' or user.role == 'manager' or user.role == 'supervisor' %}
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{% url 'order_detail' order.id %}" class="btn btn-outline-primary" title="Voir">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="{% url 'edit_order' order.id %}" class="btn btn-outline-secondary" title="Modifier">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <a href="{% url 'delete_order' order.id %}" class="btn btn-outline-danger" title="Supprimer">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                                {% else %}
+                                <td>
+                                    <a href="{% url 'order_detail' order.id %}" class="btn btn-outline-primary btn-sm" title="Voir">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                </td>
+                                {% endif %}
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="7" class="text-center text-muted py-4">
+                                    <i class="fas fa-inbox fa-2x mb-2"></i><br>
+                                    Aucune commande trouvée.
+                                    {% if search_query or status_filter %}
+                                    <br><small>Essayez de modifier vos critères de recherche</small>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+"""
+
+with open(file_path, 'w', encoding='utf-8') as f:
+    f.write(content)
+
+print(f"Successfully overwrote {file_path}")

@@ -1,89 +1,89 @@
-{% extends 'base.html' %}
 {% load static %}
+<!DOCTYPE html>
+<html lang="fr">
 
-{% block title %}Connexion - ERP Copilot{% endblock %}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connexion - Nexus ERP</title>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{% static 'css/login.css' %}">
+</head>
 
-{% block content %}
-<div class="container">
-    <div class="row justify-content-center">
-        <div class="col-xl-6 col-lg-8 col-md-10">
-            <div class="card shadow-lg my-5">
-                <div class="card-body p-5">
-                    <!-- En-tête -->
-                    <div class="text-center">
-                        <div class="mb-4">
-                            <i class="fas fa-robot fa-3x text-primary"></i>
-                        </div>
-                        <h1 class="h2 text-gray-900 mb-2">ERP Copilot</h1>
-                        <p class="text-muted mb-4">Système de Gestion Intelligent</p>
-                    </div>
+<body>
 
-                    <!-- Formulaire de connexion -->
-                    <form method="post" class="user">
-                        {% csrf_token %}
-                        
-                        {% if form.errors %}
-                        <div class="alert alert-danger">
-                            <i class="fas fa-exclamation-triangle me-2"></i>
-                            Identifiant ou mot de passe incorrect.
-                        </div>
-                        {% endif %}
+    <div class="login-container">
+        <!-- Left Side: Branding -->
+        <div class="login-brand-section">
+            <div class="brand-overlay"></div>
 
-                        <div class="form-group mb-3">
-                            <label for="id_username" class="form-label">Nom d'utilisateur</label>
-                            <input type="text" name="username" class="form-control form-control-user" 
-                                   id="id_username" placeholder="Entrez votre nom d'utilisateur" required>
-                        </div>
-
-                        <div class="form-group mb-4">
-                            <label for="id_password" class="form-label">Mot de passe</label>
-                            <input type="password" name="password" class="form-control form-control-user" 
-                                   id="id_password" placeholder="Entrez votre mot de passe" required>
-                        </div>
-
-                        <button type="submit" class="btn btn-primary btn-user btn-block py-2">
-                            <i class="fas fa-sign-in-alt me-2"></i>Se connecter
-                        </button>
-                    </form>
-
-                    <hr>
-
-                    <!-- Informations supplémentaires -->
-                    <div class="text-center">
-                        <small class="text-muted">
-                            <i class="fas fa-info-circle me-1"></i>
-                            Système sécurisé de gestion d'entreprise
-                        </small>
-                    </div>
+            <div class="brand-content">
+                <div class="brand-logo-large">
+                    <!-- Placeholder logo based on image -->
+                    <i class="fas fa-network-wired"></i>
+                </div>
+                <div class="brand-text">
+                    <h1>Nexus ERP</h1>
+                    <p>Système de Gestion Avancé</p>
                 </div>
             </div>
+
+            <!-- Cosmetic Elements matching the image tech style -->
+            <div class="glass-hex" style="bottom: 10%; right: 20%;"></div>
+            <div class="glass-hex" style="bottom: 5%; right: 10%; width: 60px; height: 60px;"></div>
+        </div>
+
+        <!-- Right Side: Form -->
+        <div class="login-form-section">
+
+            <!-- Space filler for top area -->
+            <div style="flex: 1;"></div>
+
+            <div class="login-form-container">
+                <div class="login-logo-small">
+                    <i class="fas fa-network-wired"></i>
+                </div>
+
+                <div class="login-header">
+                    <h2>CONNEXION</h2>
+                </div>
+
+                <form method="post">
+                    {% csrf_token %}
+
+                    {% if form.errors %}
+                    <div style="color: red; margin-bottom: 1rem; font-size: 0.9rem;">
+                        Identifiant ou mot de passe incorrect.
+                    </div>
+                    {% endif %}
+
+                    <div class="form-group">
+                        <label for="id_username" class="form-label">Identifiant</label>
+                        <input type="text" name="username" id="id_username" class="form-control-custom"
+                            placeholder="Entrez votre identifiant" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="id_password" class="form-label">Mot de passe</label>
+                        <input type="password" name="password" id="id_password" class="form-control-custom"
+                            placeholder="Entrez votre mot de passe" required>
+                    </div>
+
+                    <button type="submit" class="btn-login-submit">
+                        Se Connecter
+                    </button>
+
+                </form>
+            </div>
+
+            <!-- Space filler for bottom area -->
+            <div style="flex: 1;"></div>
         </div>
     </div>
-</div>
-{% endblock %}
 
-{% block extra_css %}
-<style>
-body {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    height: 100vh;
-}
+</body>
 
-.card {
-    border: none;
-    border-radius: 1rem;
-}
-
-.btn-user {
-    border-radius: 2rem;
-    padding: 0.75rem 1rem;
-    font-size: 1rem;
-}
-
-.form-control-user {
-    border-radius: 2rem;
-    padding: 0.75rem 1rem;
-    font-size: 1rem;
-}
-</style>
-{% endblock %}
+</html>
