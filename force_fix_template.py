@@ -1,4 +1,8 @@
-{% extends 'base.html' %}
+import os
+
+file_path = r"c:\Users\juana\Planification-Ordonnancement\templates\dashboard\orders\order_list.html"
+
+content = r"""{% extends 'base.html' %}
 
 {% block title %}Commandes - ERP Copilot{% endblock %}
 
@@ -208,3 +212,9 @@
     </div>
 </div>
 {% endblock %}
+"""
+
+with open(file_path, 'w', encoding='utf-8') as f:
+    f.write(content)
+
+print(f"Successfully overwrote {file_path}")

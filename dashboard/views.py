@@ -6,6 +6,7 @@ from django.utils import timezone
 from django.db import models
 from .models import Order, Product, Customer, StockMovement, OrderItem, PlanningEvent, AIConversation, AIAnalysis, Notification, NotificationManager
 from .forms import ProductForm, OrderForm, StockMovementForm, CustomerForm
+from .decorators import role_required
 from django.http import JsonResponse, HttpResponse
 import json
 from django.views.decorators.http import require_POST
@@ -206,6 +207,14 @@ def download_invoice_pdf(request, order_id):
     
     return response
 
+def home(request):
+    """Page d'accueil publique"""
+    if request.user.is_authenticated:
+        return redirect('dashboard')
+    return render(request, 'dashboard/home.html')
+
+
+
 @login_required
 def dashboard(request):
     # Générer les notifications automatiques
@@ -247,6 +256,7 @@ def dashboard(request):
 
 # ========== COMMANDES ==========
 @login_required
+@role_required(['admin', 'manager', 'supervisor'])
 def create_customer(request):
     if request.method == 'POST':
         form = CustomerForm(request.POST)
@@ -276,6 +286,7 @@ def customer_list(request):
     })
     
 @login_required
+@role_required(['admin', 'manager', 'supervisor'])
 def create_order_for_customer(request, customer_id):
     """Crée une nouvelle commande pour un client spécifique"""
     customer = get_object_or_404(Customer, id=customer_id)
@@ -374,6 +385,7 @@ def order_list(request):
     })
 
 @login_required
+@role_required(['admin', 'manager', 'supervisor'])
 def create_order(request):
     # Vérifier si un client est spécifié dans l'URL
     customer_id = request.GET.get('customer')
@@ -442,6 +454,7 @@ def order_detail(request, order_id):
     return render(request, 'dashboard/orders/order_detail.html', {'order': order})
 
 @login_required
+@role_required(['admin', 'manager', 'supervisor'])
 def edit_order(request, order_id):
     order = get_object_or_404(Order, id=order_id)
     
@@ -491,6 +504,7 @@ def edit_order(request, order_id):
     })
 
 @login_required
+@role_required(['admin', 'manager', 'supervisor'])
 def delete_order(request, order_id):
     order = get_object_or_404(Order, id=order_id)
     
@@ -503,6 +517,7 @@ def delete_order(request, order_id):
     return render(request, 'dashboard/orders/delete_order.html', {'order': order})
 
 @login_required
+@role_required(['admin', 'manager', 'supervisor'])
 def update_order_status(request, order_id):
     order = get_object_or_404(Order, id=order_id)
     old_status = order.status
@@ -599,6 +614,7 @@ def product_list(request):
     })
 
 @login_required
+@role_required(['admin', 'manager'])
 def create_product(request):
     if request.method == 'POST':
         form = ProductForm(request.POST)
@@ -618,6 +634,7 @@ def create_product(request):
     })
 
 @login_required
+@role_required(['admin', 'manager'])
 def edit_product(request, product_id):
     product = get_object_or_404(Product, id=product_id)
     
@@ -636,6 +653,7 @@ def edit_product(request, product_id):
     })
 
 @login_required
+@role_required(['admin', 'manager'])
 def delete_product(request, product_id):
     product = get_object_or_404(Product, id=product_id)
     
@@ -683,6 +701,7 @@ def delete_product(request, product_id):
     })
     
 @login_required
+@role_required(['admin', 'manager'])
 def adjust_stock(request, product_id):
     product = get_object_or_404(Product, id=product_id)
     
@@ -869,6 +888,7 @@ def planning_dashboard(request):
     return render(request, 'dashboard/planning/dashboard.html', context)
 
 @login_required
+@role_required(['admin', 'manager', 'supervisor'])
 def add_planning_event(request):
     if request.method == 'POST':
         title = request.POST.get('title')
@@ -1274,6 +1294,7 @@ def calculate_on_time_rate():
 
 
 @login_required
+@role_required(['admin', 'manager'])
 def archive_product(request, product_id):
     """Archive un produit au lieu de le supprimer"""
     product = get_object_or_404(Product, id=product_id)

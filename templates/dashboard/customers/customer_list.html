@@ -11,9 +11,11 @@
         <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary me-2">
             <i class="fas fa-arrow-left me-1"></i>Dashboard
         </a>
+        {% if user.role == 'admin' or user.role == 'manager' %}
         <a href="{% url 'create_customer' %}" class="btn btn-primary">
             <i class="fas fa-plus me-1"></i>Nouveau Client
         </a>
+        {% endif %}
     </div>
 </div>
 
@@ -78,12 +80,16 @@
                                         {{ customer.order_set.count }} commande(s)
                                     </span>
                                 </td>
+                                {% if user.role == 'admin' or user.role == 'manager' %}
                                 <td>
                                     <a href="{% url 'create_order' %}?customer={{ customer.id }}" 
                                        class="btn btn-sm btn-outline-primary" title="Nouvelle commande">
                                         <i class="fas fa-plus"></i>
                                     </a>
                                 </td>
+                                {% else %}
+                                <td class="text-muted">—</td>
+                                {% endif %}
                             </tr>
                             {% empty %}
                             <tr>
@@ -91,9 +97,11 @@
                                     <i class="fas fa-users fa-2x mb-2"></i><br>
                                     Aucun client trouvé.
                                     <br>
+                                    {% if user.role == 'admin' or user.role == 'manager' %}
                                     <a href="{% url 'create_customer' %}" class="btn btn-primary mt-2">
                                         <i class="fas fa-plus me-1"></i>Créer le premier client
                                     </a>
+                                    {% endif %}
                                 </td>
                             </tr>
                             {% endfor %}
